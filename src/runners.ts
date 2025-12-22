@@ -49,7 +49,7 @@ export class ClickHouseRunner implements DatabaseRunner {
       url: "http://localhost:8123",
       username: "default",
       password: "clickhouse",
-      database: "default",
+      database: "benchmarks",
     });
     return Promise.resolve();
   }

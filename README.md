@@ -45,15 +45,23 @@ pnpm compose:up
 
 ### Generate Test Data
 
-Use [@mkven/samples-generation](https://www.npmjs.com/package/@mkven/samples-generation) to populate tables:
-
 ```bash
-# Generate 1 million rows in all databases
-npx tsx node_modules/@mkven/samples-generation/scripts/generate-all.ts -r 1_000_000
+# Generate 100 million rows in all databases (default)
+pnpm generate
 
-# Generate 1 billion rows with batching
-npx tsx node_modules/@mkven/samples-generation/scripts/generate-all.ts -r 1_000_000_000 -b 100_000_000
+# Generate custom row count
+pnpm generate -n 1_000_000
+
+# Custom batch size
+pnpm generate -n 10_000_000 -b 1_000_000
+
+# Specific database only
+pnpm generate:postgres -n 10_000_000
+pnpm generate:clickhouse -n 10_000_000
+pnpm generate:trino -n 10_000_000
 ```
+
+Default batch sizes: 1M for PostgreSQL, 100M for ClickHouse/Trino.
 
 ### Run Benchmarks
 
@@ -84,13 +92,28 @@ pnpm compose:reset
 
 ## Docker Services
 
-| Service    | Port(s)                    | Credentials           |
-| ---------- | -------------------------- | --------------------- |
-| PostgreSQL | 5432                       | postgres:postgres     |
-| ClickHouse | 8123 (HTTP), 9009 (native) | default:clickhouse    |
-| Trino      | 8080                       | trino (no password)   |
-| MinIO      | 9000 (S3), 9001 (console)  | minioadmin:minioadmin |
-| Nessie     | 19120                      | -                     |
+| Service    | Port(s)                    | Credentials           | Database           |
+| ---------- | -------------------------- | --------------------- | ------------------ |
+| PostgreSQL | 5432                       | postgres:postgres     | benchmarks         |
+| ClickHouse | 8123 (HTTP), 9009 (native) | default:clickhouse    | benchmarks         |
+| Trino      | 8080                       | trino (no password)   | iceberg.benchmarks |
+| MinIO      | 9000 (S3), 9001 (console)  | minioadmin:minioadmin | -                  |
+| Nessie     | 19120                      | -                     | -                  |
+
+## Sample Results (100K rows)
+
+| Query               | PostgreSQL | ClickHouse | Trino/Iceberg |
+| ------------------- | ---------- | ---------- | ------------- |
+| full-count          | 2ms        | 3ms        | 59ms          |
+| filter-by-status    | 4ms        | 7ms        | 66ms          |
+| aggregate-by-status | 9ms        | 12ms       | 75ms          |
+| range-scan          | 4ms        | 6ms        | 69ms          |
+| top-n               | 6ms        | 10ms       | 69ms          |
+| string-like         | 8ms        | 7ms        | 68ms          |
+| distinct-count      | 10ms       | 7ms        | 57ms          |
+| percentile          | 14ms       | 7ms        | 70ms          |
+
+> Note: Trino has higher latency due to distributed query overhead. The differences become more pronounced with larger datasets.
 
 ## Development
 

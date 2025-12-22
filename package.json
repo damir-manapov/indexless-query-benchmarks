@@ -9,6 +9,10 @@
     "node": ">=20"
   },
   "scripts": {
+    "generate": "tsx src/generate-data.ts",
+    "generate:postgres": "tsx src/generate-data.ts --postgres",
+    "generate:clickhouse": "tsx src/generate-data.ts --clickhouse",
+    "generate:trino": "tsx src/generate-data.ts --trino",
     "benchmark": "tsx src/benchmark.ts",
     "benchmark:trino": "tsx src/benchmark.ts --trino",
     "benchmark:clickhouse": "tsx src/benchmark.ts --clickhouse",
