@@ -14,12 +14,7 @@ pnpm audit --prod
 
 echo ""
 echo "=== Checking for outdated dependencies ==="
-OUTDATED=$(pnpm outdated 2>&1 || true)
-if echo "$OUTDATED" | grep -q "Package"; then
-  echo "$OUTDATED"
-  echo ""
-  echo "NOTE: Some dependencies have updates available (not blocking)"
-fi
+./renovate-check.sh
 
 echo ""
 echo "=== Health check passed ==="
