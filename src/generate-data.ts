@@ -4,6 +4,7 @@ import {
   ClickHouseDataGenerator,
   TrinoDataGenerator,
   type TableConfig,
+  type BaseDataGenerator,
 } from "@mkven/samples-generation";
 
 const { values } = parseArgs({
@@ -50,9 +51,6 @@ const CATEGORY_COUNT = 10_000;
 
 // If no database specified, run all
 const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
-const runPostgres = values.postgres || noDbSelected;
-const runClickHouse = values.clickhouse || noDbSelected;
-const runTrino = values.trino || noDbSelected;
 
 // Categories table (small lookup table for JOIN benchmarks)
 const CATEGORIES_CONFIG: TableConfig = {
@@ -60,11 +58,24 @@ const CATEGORIES_CONFIG: TableConfig = {
   columns: [
     { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
     { name: "name", type: "string", generator: { kind: "randomString", length: 20 } },
+    { name: "code", type: "string", generator: { kind: "randomString", length: 6 } },
     {
       name: "priority",
       type: "string",
       generator: { kind: "choice", values: ["low", "medium", "high", "critical"] },
     },
+    {
+      name: "region",
+      type: "string",
+      generator: { kind: "choice", values: ["north", "south", "east", "west", "central"] },
+    },
+    { name: "weight", type: "float", generator: { kind: "randomFloat", min: 0, max: 100 } },
+    {
+      name: "is_active",
+      type: "integer",
+      generator: { kind: "randomInt", min: 0, max: 1 },
+    },
+    { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
   ],
 };
 
@@ -92,89 +103,53 @@ const TABLE_CONFIG: TableConfig = {
   ],
 };
 
-async function generatePostgres(): Promise<void> {
-  console.log("\n=== PostgreSQL ===");
-  const generator = new PostgresDataGenerator({
-    host: "localhost",
-    port: 5432,
-    database: "benchmarks",
-    username: "postgres",
-    password: "postgres",
-  });
-
-  try {
-    await generator.connect();
-
-    // Generate categories first
-    console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
-    await generator.generate({
-      table: CATEGORIES_CONFIG,
-      rowCount: CATEGORY_COUNT,
-      batchSize: CATEGORY_COUNT,
-      dropFirst: true,
-    });
-
-    // Generate samples
-    const result = await generator.generate({
-      table: TABLE_CONFIG,
-      rowCount: ROW_COUNT,
-      batchSize: BATCH_SIZE,
-      dropFirst: true,
-    });
-    console.log(`Generated ${String(result.rowsInserted)} rows in ${String(result.durationMs)}ms`);
-  } finally {
-    await generator.disconnect();
-  }
+interface DatabaseConfig {
+  name: string;
+  createGenerator: () => BaseDataGenerator;
 }
 
-async function generateClickHouse(): Promise<void> {
-  console.log("\n=== ClickHouse ===");
-  const generator = new ClickHouseDataGenerator({
-    host: "localhost",
-    port: 8123,
-    username: "default",
-    password: "clickhouse",
-    database: "benchmarks",
-  });
+const DATABASES: DatabaseConfig[] = [
+  {
+    name: "PostgreSQL",
+    createGenerator: () =>
+      new PostgresDataGenerator({
+        host: "localhost",
+        port: 5432,
+        database: "benchmarks",
+        username: "postgres",
+        password: "postgres",
+      }),
+  },
+  {
+    name: "ClickHouse",
+    createGenerator: () =>
+      new ClickHouseDataGenerator({
+        host: "localhost",
+        port: 8123,
+        username: "default",
+        password: "clickhouse",
+        database: "benchmarks",
+      }),
+  },
+  {
+    name: "Trino/Iceberg",
+    createGenerator: () =>
+      new TrinoDataGenerator({
+        host: "localhost",
+        port: 8080,
+        catalog: "iceberg",
+        schema: "benchmarks",
+        user: "trino",
+      }),
+  },
+];
+
+async function generateForDatabase(config: DatabaseConfig): Promise<void> {
+  console.log(`\n=== ${config.name} ===`);
+  const generator = config.createGenerator();
 
   try {
     await generator.connect();
-
-    // Generate categories first
-    console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
-    await generator.generate({
-      table: CATEGORIES_CONFIG,
-      rowCount: CATEGORY_COUNT,
-      batchSize: CATEGORY_COUNT,
-      dropFirst: true,
-    });
-
-    // Generate samples
-    const result = await generator.generate({
-      table: TABLE_CONFIG,
-      rowCount: ROW_COUNT,
-      batchSize: BATCH_SIZE,
-      dropFirst: true,
-    });
-    console.log(`Generated ${String(result.rowsInserted)} rows in ${String(result.durationMs)}ms`);
-  } finally {
-    await generator.disconnect();
-  }
-}
-
-async function generateTrino(): Promise<void> {
-  console.log("\n=== Trino/Iceberg ===");
-  const generator = new TrinoDataGenerator({
-    host: "localhost",
-    port: 8080,
-    catalog: "iceberg",
-    schema: "benchmarks",
-    user: "trino",
-  });
-
-  try {
-    await generator.connect();
-    // Schema is created automatically by connect()
 
     // Generate categories first
     console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
@@ -201,16 +176,17 @@ async function generateTrino(): Promise<void> {
 async function main(): Promise<void> {
   console.log(`Generating ${ROW_COUNT.toLocaleString()} rows...`);
 
-  if (runPostgres) {
-    await generatePostgres();
-  }
+  const dbsToRun = noDbSelected
+    ? DATABASES
+    : DATABASES.filter(
+        (db) =>
+          (values.postgres && db.name === "PostgreSQL") ||
+          (values.clickhouse && db.name === "ClickHouse") ||
+          (values.trino && db.name === "Trino/Iceberg")
+      );
 
-  if (runClickHouse) {
-    await generateClickHouse();
-  }
-
-  if (runTrino) {
-    await generateTrino();
+  for (const db of dbsToRun) {
+    await generateForDatabase(db);
   }
 
   console.log("\nDone!");

@@ -130,4 +130,40 @@ export const QUERIES: QueryDefinition[] = [
         "SELECT c.priority, COUNT(*), AVG(s.value) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id GROUP BY c.priority",
     },
   },
+  {
+    name: "join-multi-filter",
+    description: "JOIN with multiple filter conditions",
+    sql: {
+      postgres:
+        "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.priority = 'high' AND c.region = 'north' AND c.is_active = 1",
+      clickhouse:
+        "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.priority = 'high' AND c.region = 'north' AND c.is_active = 1",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id WHERE c.priority = 'high' AND c.region = 'north' AND c.is_active = 1",
+    },
+  },
+  {
+    name: "join-range-filter",
+    description: "JOIN with range filter on numeric column",
+    sql: {
+      postgres:
+        "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.weight BETWEEN 25 AND 75",
+      clickhouse:
+        "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.weight BETWEEN 25 AND 75",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id WHERE c.weight BETWEEN 25 AND 75",
+    },
+  },
+  {
+    name: "join-group-multi",
+    description: "JOIN with GROUP BY multiple columns",
+    sql: {
+      postgres:
+        "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
+      clickhouse:
+        "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
+      trino:
+        "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
+    },
+  },
 ];
