@@ -3,11 +3,18 @@ import type { QueryDefinition } from "./types.js";
 /**
  * Benchmark queries for indexless tables.
  * These queries demonstrate full table scans and columnar storage benefits.
+ *
+ * Tags:
+ * - basic: Simple single-table queries
+ * - join: Queries involving JOINs
+ * - entity-resolution: Duplicate detection and matching queries
+ * - expensive: Queries that may timeout on large datasets
  */
 export const QUERIES: QueryDefinition[] = [
   {
     name: "full-count",
     description: "Count all rows in the table",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT COUNT(*) FROM samples",
       clickhouse: "SELECT COUNT(*) FROM samples",
@@ -17,6 +24,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "filter-by-status",
     description: "Filter rows by status column",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT COUNT(*) FROM samples WHERE status = 'active'",
       clickhouse: "SELECT COUNT(*) FROM samples WHERE status = 'active'",
@@ -26,6 +34,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "aggregate-by-status",
     description: "Group by status with aggregation",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT status, COUNT(*), AVG(value) FROM samples GROUP BY status",
       clickhouse: "SELECT status, COUNT(*), AVG(value) FROM samples GROUP BY status",
@@ -35,6 +44,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "range-scan",
     description: "Range scan on value column",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT COUNT(*) FROM samples WHERE value BETWEEN 100 AND 500",
       clickhouse: "SELECT COUNT(*) FROM samples WHERE value BETWEEN 100 AND 500",
@@ -44,6 +54,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "top-n",
     description: "Get top N rows by value",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT * FROM samples ORDER BY value DESC LIMIT 100",
       clickhouse: "SELECT * FROM samples ORDER BY value DESC LIMIT 100",
@@ -53,6 +64,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "string-like",
     description: "String pattern matching (full scan)",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT COUNT(*) FROM samples WHERE first_name LIKE '%an%'",
       clickhouse: "SELECT COUNT(*) FROM samples WHERE first_name LIKE '%an%'",
@@ -62,6 +74,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "distinct-count",
     description: "Count distinct values",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT COUNT(DISTINCT status) FROM samples",
       clickhouse: "SELECT COUNT(DISTINCT status) FROM samples",
@@ -71,6 +84,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "percentile",
     description: "Calculate percentiles",
+    tags: ["basic"],
     sql: {
       postgres:
         "SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY value), PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY value) FROM samples",
@@ -82,6 +96,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "pagination-offset",
     description: "Deep pagination with OFFSET (unordered)",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT * FROM samples OFFSET 10000 LIMIT 10",
       clickhouse: "SELECT * FROM samples LIMIT 10 OFFSET 10000",
@@ -91,6 +106,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "pagination-offset-ordered",
     description: "Deep pagination with OFFSET (ordered)",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT * FROM samples ORDER BY value OFFSET 10000 LIMIT 10",
       clickhouse: "SELECT * FROM samples ORDER BY value LIMIT 10 OFFSET 10000",
@@ -100,6 +116,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dedupe",
     description: "Select distinct rows by multiple columns",
+    tags: ["basic"],
     sql: {
       postgres: "SELECT DISTINCT first_name, last_name FROM samples",
       clickhouse: "SELECT DISTINCT first_name, last_name FROM samples",
@@ -109,6 +126,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "filter-join",
     description: "Filter with JOIN on lookup table",
+    tags: ["join"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.priority = 'high'",
@@ -121,6 +139,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "aggregate-join",
     description: "Aggregate with JOIN on lookup table",
+    tags: ["join"],
     sql: {
       postgres:
         "SELECT c.priority, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority",
@@ -133,6 +152,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "join-multi-filter",
     description: "JOIN with multiple filter conditions",
+    tags: ["join"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.priority = 'high' AND c.region = 'north' AND c.is_active = 1",
@@ -145,6 +165,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "join-range-filter",
     description: "JOIN with range filter on numeric column",
+    tags: ["join"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.weight BETWEEN 25 AND 75",
@@ -157,6 +178,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "join-group-multi",
     description: "JOIN with GROUP BY multiple columns",
+    tags: ["join"],
     sql: {
       postgres:
         "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
@@ -170,6 +192,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-exact-name",
     description: "Find exact duplicate names (GROUP BY HAVING)",
+    tags: ["entity-resolution"],
     sql: {
       postgres:
         "SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name HAVING COUNT(*) > 1",
@@ -182,6 +205,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-group-size",
     description: "Distribution of duplicate group sizes",
+    tags: ["entity-resolution"],
     sql: {
       postgres:
         "SELECT cnt, COUNT(*) as groups FROM (SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name) sub GROUP BY cnt ORDER BY cnt",
@@ -194,6 +218,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-window-rank",
     description: "Rank duplicates within groups (window function)",
+    tags: ["entity-resolution"],
     sql: {
       postgres:
         "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM samples",
@@ -206,6 +231,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-exact",
     description: "Match corrupted to samples by exact email",
+    tags: ["entity-resolution"],
     sql: {
       postgres: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.email = s.email",
       clickhouse: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.email = s.email",
@@ -216,6 +242,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-corrupted-exact",
     description: "Match corrupted email to original (should find fewer)",
+    tags: ["entity-resolution"],
     sql: {
       postgres: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.corrupted_email = s.email",
       clickhouse: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.corrupted_email = s.email",
@@ -226,6 +253,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-self-join",
     description: "Self-join to find duplicate pairs",
+    tags: ["entity-resolution"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM samples a JOIN samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",
@@ -238,6 +266,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-fuzzy-levenshtein",
     description: "Fuzzy match corrupted email using Levenshtein distance <= 1",
+    tags: ["entity-resolution", "expensive"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM corrupted c JOIN samples s ON levenshtein(c.corrupted_email, s.email) <= 1",

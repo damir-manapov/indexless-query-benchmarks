@@ -9,6 +9,7 @@ export interface BenchmarkResult {
 export interface QueryDefinition {
   name: string;
   description: string;
+  tags?: string[];
   sql: {
     postgres?: string;
     clickhouse?: string;

@@ -40,6 +40,8 @@ const { values } = parseArgs({
     warmup: { type: "string", default: "1" },
     runs: { type: "string", short: "r", default: "3" },
     query: { type: "string", short: "q" },
+    exclude: { type: "string", short: "e" },
+    only: { type: "string", short: "o" },
     report: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -56,8 +58,12 @@ Options:
   --warmup <n>     Number of warmup runs (default: 1)
   -r, --runs <n>   Number of benchmark runs (default: 3)
   -q, --query <n>  Run specific query by name
+  -e, --exclude <tag>  Exclude queries with this tag (e.g., expensive)
+  -o, --only <tag>     Run only queries with this tag
   --report         Generate JSON and Markdown reports in reports/
   -h, --help       Show this help message
+
+Tags: basic, join, entity-resolution, expensive
 
 If no database is specified, all databases are benchmarked.
 
@@ -65,6 +71,8 @@ Examples:
   pnpm benchmark                          # All databases, all queries
   pnpm benchmark --postgres --trino       # PostgreSQL and Trino only
   pnpm benchmark -q full-count -r 5       # Specific query, 5 runs
+  pnpm benchmark --exclude expensive      # Skip expensive queries
+  pnpm benchmark --only entity-resolution # Only entity resolution queries
   pnpm benchmark --report                 # Generate reports
 `);
   process.exit(0);
@@ -81,12 +89,33 @@ const runTrino = values.trino || noDbSelected;
 
 // Filter queries if specified
 const queryFilter = values.query;
-const queriesToRun = queryFilter ? QUERIES.filter((q) => q.name === queryFilter) : QUERIES;
+const excludeTag = values.exclude;
+const onlyTag = values.only;
 
-if (queryFilter && queriesToRun.length === 0) {
-  console.error(`Query "${queryFilter}" not found. Available queries:`);
+let queriesToRun = QUERIES;
+
+// Filter by specific query name
+if (queryFilter) {
+  queriesToRun = queriesToRun.filter((q) => q.name === queryFilter);
+}
+
+// Filter by tags
+if (excludeTag) {
+  queriesToRun = queriesToRun.filter((q) => !q.tags?.includes(excludeTag));
+}
+if (onlyTag) {
+  queriesToRun = queriesToRun.filter((q) => q.tags?.includes(onlyTag));
+}
+
+if (queriesToRun.length === 0) {
+  console.error(`No queries match the specified filters.`);
+  if (queryFilter) console.error(`  Query: ${queryFilter}`);
+  if (excludeTag) console.error(`  Exclude tag: ${excludeTag}`);
+  if (onlyTag) console.error(`  Only tag: ${onlyTag}`);
+  console.error(`\nAvailable queries:`);
   QUERIES.forEach((q) => {
-    console.error(`  - ${q.name}: ${q.description}`);
+    const tags = q.tags?.length ? ` [${q.tags.join(", ")}]` : "";
+    console.error(`  - ${q.name}${tags}: ${q.description}`);
   });
   process.exit(1);
 }

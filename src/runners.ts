@@ -50,6 +50,7 @@ export class ClickHouseRunner implements DatabaseRunner {
       username: "default",
       password: "clickhouse",
       database: "benchmarks",
+      request_timeout: 300_000, // 5 minutes for expensive queries like Levenshtein
     });
     return Promise.resolve();
   }
