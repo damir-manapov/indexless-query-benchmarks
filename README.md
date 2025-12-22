@@ -28,6 +28,8 @@ This may not be your case. You may heavily constrain what users can configure, f
 - String pattern matching (LIKE)
 - Distinct count
 - Percentile calculations
+- Deep pagination (OFFSET)
+- Deduplication (SELECT DISTINCT)
 
 ## Prerequisites
 

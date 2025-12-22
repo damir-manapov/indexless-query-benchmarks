@@ -79,4 +79,31 @@ export const QUERIES: QueryDefinition[] = [
         "SELECT approx_percentile(value, 0.5), approx_percentile(value, 0.95) FROM iceberg.benchmarks.samples",
     },
   },
+  {
+    name: "pagination-offset",
+    description: "Deep pagination with OFFSET (unordered)",
+    sql: {
+      postgres: "SELECT * FROM samples OFFSET 10000 LIMIT 10",
+      clickhouse: "SELECT * FROM samples LIMIT 10 OFFSET 10000",
+      trino: "SELECT * FROM iceberg.benchmarks.samples OFFSET 10000 LIMIT 10",
+    },
+  },
+  {
+    name: "pagination-offset-ordered",
+    description: "Deep pagination with OFFSET (ordered)",
+    sql: {
+      postgres: "SELECT * FROM samples ORDER BY value OFFSET 10000 LIMIT 10",
+      clickhouse: "SELECT * FROM samples ORDER BY value LIMIT 10 OFFSET 10000",
+      trino: "SELECT * FROM iceberg.benchmarks.samples ORDER BY value OFFSET 10000 LIMIT 10",
+    },
+  },
+  {
+    name: "dedupe",
+    description: "Select distinct rows by multiple columns",
+    sql: {
+      postgres: "SELECT DISTINCT status, name FROM samples",
+      clickhouse: "SELECT DISTINCT status, name FROM samples",
+      trino: "SELECT DISTINCT status, name FROM iceberg.benchmarks.samples",
+    },
+  },
 ];
