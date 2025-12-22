@@ -79,7 +79,12 @@ pnpm benchmark -q full-count
 
 # Multiple runs
 pnpm benchmark -r 5 --warmup 2
+
+# Generate reports (JSON + Markdown)
+pnpm benchmark --report
 ```
+
+Reports are saved to `reports/` directory with timestamped filenames.
 
 ### Stop Databases
 

@@ -26,7 +26,7 @@ Options:
   --clickhouse     Generate data for ClickHouse
   --trino          Generate data for Trino/Iceberg
   -n, --rows <n>   Number of rows to generate (default: 100_000_000)
-  -b, --batch <n>  Batch size (default: 1M for PG, 100M for CH/Trino)
+  -b, --batch <n>  Batch size (default: 10_000_000)
   -h, --help       Show this help message
 
 If no database is specified, all databases are populated.
@@ -45,9 +45,7 @@ function parseNumber(value: string): number {
 }
 
 const ROW_COUNT = parseNumber(values.rows);
-const BATCH_SIZE_PG = values.batch ? parseNumber(values.batch) : 1_000_000;
-const BATCH_SIZE_CH = values.batch ? parseNumber(values.batch) : 100_000_000;
-const BATCH_SIZE_TRINO = values.batch ? parseNumber(values.batch) : 100_000_000;
+const BATCH_SIZE = values.batch ? parseNumber(values.batch) : 10_000_000;
 
 // If no database specified, run all
 const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
@@ -89,7 +87,7 @@ async function generatePostgres(): Promise<void> {
     const result = await generator.generate({
       table: TABLE_CONFIG,
       rowCount: ROW_COUNT,
-      batchSize: BATCH_SIZE_PG,
+      batchSize: BATCH_SIZE,
       dropFirst: true,
     });
     console.log(`Generated ${String(result.rowsInserted)} rows in ${String(result.durationMs)}ms`);
@@ -113,7 +111,7 @@ async function generateClickHouse(): Promise<void> {
     const result = await generator.generate({
       table: TABLE_CONFIG,
       rowCount: ROW_COUNT,
-      batchSize: BATCH_SIZE_CH,
+      batchSize: BATCH_SIZE,
       dropFirst: true,
     });
     console.log(`Generated ${String(result.rowsInserted)} rows in ${String(result.durationMs)}ms`);
@@ -139,7 +137,7 @@ async function generateTrino(): Promise<void> {
     const result = await generator.generate({
       table: TABLE_CONFIG,
       rowCount: ROW_COUNT,
-      batchSize: BATCH_SIZE_TRINO,
+      batchSize: BATCH_SIZE,
       dropFirst: true,
     });
     console.log(`Generated ${String(result.rowsInserted)} rows in ${String(result.durationMs)}ms`);
