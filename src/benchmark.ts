@@ -18,6 +18,7 @@ interface QueryResult {
   avgMs: number;
   p95Ms: number;
   maxMs: number;
+  error?: string;
 }
 
 interface TableSize {
@@ -168,8 +169,16 @@ async function benchmarkDatabase(runner: DatabaseRunner): Promise<DatabaseResult
       const errors = results.filter((r) => r.error);
       if (errors.length > 0) {
         console.error(`  Errors: ${String(errors.length)}/${String(results.length)}`);
-        errors.forEach((e) => {
-          console.error(`    - ${e.error ?? "Unknown error"}`);
+        const firstError = errors[0]?.error ?? "Unknown error";
+        console.error(`    - ${firstError}`);
+        dbResult.results.push({
+          query: queryDef.name,
+          description: queryDef.description,
+          minMs: 0,
+          avgMs: 0,
+          p95Ms: 0,
+          maxMs: 0,
+          error: firstError,
         });
         continue;
       }
@@ -295,8 +304,9 @@ function generateMarkdown(report: BenchmarkReport): string {
   lines.push("## Results");
   lines.push("");
 
-  // Get all unique queries
-  const queries = report.databases[0]?.results.map((r) => r.query) ?? [];
+  // Get all unique queries across all databases
+  const allQueries = report.databases.flatMap((db) => db.results.map((r) => r.query));
+  const queries = [...new Set(allQueries)];
 
   // Header
   const dbNames = report.databases.map((d) => d.database);
@@ -307,7 +317,9 @@ function generateMarkdown(report: BenchmarkReport): string {
   for (const query of queries) {
     const cells = report.databases.map((db) => {
       const result = db.results.find((r) => r.query === query);
-      return result ? formatDuration(result.avgMs) : "-";
+      if (!result) return "-";
+      if (result.error) return "ERROR";
+      return formatDuration(result.avgMs);
     });
     lines.push(`| ${query} | ${cells.join(" | ")} |`);
   }
@@ -322,11 +334,31 @@ function generateMarkdown(report: BenchmarkReport): string {
     lines.push("| Query | Min | Avg | P95 | Max |");
     lines.push("|-------|----:|----:|----:|----:|");
     for (const r of db.results) {
-      lines.push(
-        `| ${r.query} | ${formatDuration(r.minMs)} | ${formatDuration(r.avgMs)} | ${formatDuration(r.p95Ms)} | ${formatDuration(r.maxMs)} |`
-      );
+      if (r.error) {
+        lines.push(`| ${r.query} | ERROR | - | - | - |`);
+      } else {
+        lines.push(
+          `| ${r.query} | ${formatDuration(r.minMs)} | ${formatDuration(r.avgMs)} | ${formatDuration(r.p95Ms)} | ${formatDuration(r.maxMs)} |`
+        );
+      }
     }
     lines.push("");
+  }
+
+  // Errors section
+  const allErrors = report.databases.flatMap((db) =>
+    db.results.filter((r) => r.error).map((r) => ({ database: db.database, query: r.query, error: r.error }))
+  );
+  if (allErrors.length > 0) {
+    lines.push("## Errors");
+    lines.push("");
+    for (const e of allErrors) {
+      lines.push(`**${e.database} / ${e.query}:**`);
+      lines.push("```");
+      lines.push(e.error ?? "Unknown error");
+      lines.push("```");
+      lines.push("");
+    }
   }
 
   return lines.join("\n");

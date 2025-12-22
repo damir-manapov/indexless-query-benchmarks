@@ -27,6 +27,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "compose:up": "docker compose -f compose/docker-compose.yml up -d starter",
+    "compose:up:postgres": "docker compose -f compose/docker-compose.yml up -d postgres",
+    "compose:up:clickhouse": "docker compose -f compose/docker-compose.yml up -d clickhouse",
+    "compose:up:trino": "docker compose -f compose/docker-compose.yml up -d trino",
     "compose:down": "docker compose -f compose/docker-compose.yml down",
     "compose:restart": "pnpm compose:down && pnpm compose:up",
     "compose:reset": "docker compose -f compose/docker-compose.yml down -v --remove-orphans"
