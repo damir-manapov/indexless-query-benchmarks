@@ -42,20 +42,18 @@ This may not be your case. You may heavily constrain what users can configure, f
 - JOIN with range filter
 - JOIN with GROUP BY multiple columns
 
-**Entity resolution queries:**
-
-Duplicate detection:
+**Deduplication queries:**
 
 - Find duplicate names (GROUP BY HAVING)
 - Duplicate group size distribution
 - Rank duplicates within groups (window function)
-- Self-join to find duplicate pairs
 
-Entity matching:
+**Matching queries:**
 
 - Match corrupted to samples by exact email
 - Match corrupted email to original
-- Fuzzy match using Levenshtein distance
+- Self-join to find duplicate pairs
+- Fuzzy match using Levenshtein distance (expensive)
 
 ## Prerequisites
 
@@ -114,9 +112,24 @@ pnpm benchmark -q full-count
 # Multiple runs
 pnpm benchmark -r 5 --warmup 2
 
+# Filter by tags
+pnpm benchmark --only matching       # Only matching queries
+pnpm benchmark --only deduplication   # Only deduplication queries
+pnpm benchmark --exclude expensive    # Skip expensive queries
+
 # Generate reports (JSON + Markdown)
 pnpm benchmark --report
 ```
+
+**Available tags:**
+
+| Tag             | Description                                |
+| --------------- | ------------------------------------------ |
+| `basic`         | Simple single-table queries                |
+| `join`          | Queries involving JOINs                    |
+| `deduplication` | Finding duplicates within a single table   |
+| `matching`      | Linking records between tables             |
+| `expensive`     | Queries that may timeout on large datasets |
 
 Reports are saved to `reports/` directory with timestamped filenames.
 
