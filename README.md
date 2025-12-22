@@ -121,6 +121,12 @@ pnpm benchmark --exclude expensive    # Skip expensive queries
 pnpm benchmark --report
 ```
 
+Reports are saved to `reports/` directory with timestamped filenames. Each report includes:
+
+- **Table sizes** - Row counts for each table
+- **Summary table** - Average times per query across databases
+- **Detailed results** - Min/Avg/P95/Max for each query per database
+
 **Available tags:**
 
 | Tag             | Description                                |

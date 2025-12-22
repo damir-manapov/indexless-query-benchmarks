@@ -331,8 +331,9 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
       dropFirst: true,
     });
 
+    const durationSec = (result.durationMs / 1000).toFixed(1);
     console.log(
-      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${String(result.durationMs)}ms`
+      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${durationSec}s`
     );
   } finally {
     await generator.disconnect();

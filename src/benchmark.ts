@@ -20,13 +20,20 @@ interface QueryResult {
   maxMs: number;
 }
 
+interface TableSize {
+  table: string;
+  rows: number;
+}
+
 interface DatabaseResult {
   database: string;
+  tableSizes?: TableSize[];
   results: QueryResult[];
 }
 
 interface BenchmarkReport {
   timestamp: string;
+  command: string;
   warmupRuns: number;
   benchmarkRuns: number;
   databases: DatabaseResult[];
@@ -128,6 +135,14 @@ async function benchmarkDatabase(runner: DatabaseRunner): Promise<DatabaseResult
     await runner.connect();
     console.log(`Connected to ${runner.name}`);
 
+    // Get table sizes
+    try {
+      dbResult.tableSizes = await runner.getTableSizes();
+      console.log(`Tables: ${dbResult.tableSizes.map((t) => `${t.table}(${t.rows.toLocaleString()})`).join(", ")}`);
+    } catch (error) {
+      console.log(`  Could not get table sizes: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     for (const queryDef of queriesToRun) {
       console.log(`\n[${queryDef.name}] ${queryDef.description}`);
 
@@ -186,8 +201,23 @@ async function main(): Promise<void> {
   console.log(`Warmup: ${String(WARMUP_RUNS)} runs, Benchmark: ${String(BENCHMARK_RUNS)} runs`);
   console.log(`Queries: ${queriesToRun.map((q) => q.name).join(", ")}`);
 
+  // Build command to reproduce
+  const cmdParts = ["pnpm benchmark"];
+  if (!noDbSelected) {
+    if (runPostgres) cmdParts.push("--postgres");
+    if (runClickHouse) cmdParts.push("--clickhouse");
+    if (runTrino) cmdParts.push("--trino");
+  }
+  if (values.query) cmdParts.push(`-q ${values.query}`);
+  if (values.exclude) cmdParts.push(`--exclude ${values.exclude}`);
+  if (values.only) cmdParts.push(`--only ${values.only}`);
+  cmdParts.push(`--warmup ${String(WARMUP_RUNS)}`);
+  cmdParts.push(`-r ${String(BENCHMARK_RUNS)}`);
+  cmdParts.push("--report");
+
   const report: BenchmarkReport = {
     timestamp: new Date().toISOString(),
+    command: cmdParts.join(" "),
     warmupRuns: WARMUP_RUNS,
     benchmarkRuns: BENCHMARK_RUNS,
     databases: [],
@@ -238,9 +268,28 @@ function generateMarkdown(report: BenchmarkReport): string {
     `**Warmup Runs:** ${String(report.warmupRuns)}`,
     `**Benchmark Runs:** ${String(report.benchmarkRuns)}`,
     "",
-    "## Results",
+    "**Command to reproduce:**",
+    "```bash",
+    report.command,
+    "```",
     "",
   ];
+
+  // Table sizes section
+  const firstDbWithSizes = report.databases.find((d) => d.tableSizes && d.tableSizes.length > 0);
+  if (firstDbWithSizes?.tableSizes) {
+    lines.push("## Table Sizes");
+    lines.push("");
+    lines.push("| Table | Rows |");
+    lines.push("|-------|-----:|");
+    for (const t of firstDbWithSizes.tableSizes) {
+      lines.push(`| ${t.table} | ${t.rows.toLocaleString()} |`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Results");
+  lines.push("");
 
   // Get all unique queries
   const queries = report.databases[0]?.results.map((r) => r.query) ?? [];
