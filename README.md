@@ -20,6 +20,8 @@ This may not be your case. You may heavily constrain what users can configure, f
 
 ### Query Types
 
+**Basic queries:**
+
 - Full count
 - Filter by column
 - Group by with aggregation
@@ -28,19 +30,32 @@ This may not be your case. You may heavily constrain what users can configure, f
 - String pattern matching (LIKE)
 - Distinct count
 - Percentile calculations
-- Deep pagination (OFFSET)
+- Deep pagination - unordered (OFFSET)
+- Deep pagination - ordered (OFFSET + ORDER BY)
 - Deduplication (SELECT DISTINCT)
+
+**JOIN queries:**
+
 - JOIN with filter on lookup table
 - JOIN with aggregate on lookup table
 - JOIN with multiple filter conditions
 - JOIN with range filter
 - JOIN with GROUP BY multiple columns
-- Entity resolution: find duplicate names
-- Entity resolution: duplicate group size distribution
-- Entity resolution: rank duplicates (window function)
-- Entity matching: exact email match
-- Entity matching: corrupted email match
-- Entity matching: self-join for duplicate pairs
+
+**Entity resolution queries:**
+
+Duplicate detection:
+
+- Find duplicate names (GROUP BY HAVING)
+- Duplicate group size distribution
+- Rank duplicates within groups (window function)
+- Self-join to find duplicate pairs
+
+Entity matching:
+
+- Match corrupted to samples by exact email
+- Match corrupted email to original
+- Fuzzy match using Levenshtein distance
 
 ## Prerequisites
 

@@ -235,4 +235,16 @@ export const QUERIES: QueryDefinition[] = [
         "SELECT COUNT(*) FROM iceberg.benchmarks.samples a JOIN iceberg.benchmarks.samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",
     },
   },
+  {
+    name: "match-fuzzy-levenshtein",
+    description: "Fuzzy match corrupted email using Levenshtein distance <= 1",
+    sql: {
+      postgres:
+        "SELECT COUNT(*) FROM corrupted c JOIN samples s ON levenshtein(c.corrupted_email, s.email) <= 1",
+      clickhouse:
+        "SELECT COUNT(*) FROM corrupted c JOIN samples s ON levenshteinDistance(c.corrupted_email, s.email) <= 1",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.corrupted c JOIN iceberg.benchmarks.samples s ON levenshtein_distance(c.corrupted_email, s.email) <= 1",
+    },
+  },
 ];
