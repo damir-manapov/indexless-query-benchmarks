@@ -7,6 +7,7 @@ import {
   type BaseDataGenerator,
   type Scenario,
 } from "@mkven/samples-generation";
+import { formatDuration } from "./utils.js";
 import {
   getEnglishMaleNames,
   getEnglishFemaleNames,
@@ -129,48 +130,49 @@ const TABLE_CONFIG: TableConfig = {
 
 // Corrupted table - same structure as samples, linked via sample_id
 // Will have names/emails copied from samples then corrupted
-const CORRUPTED_CONFIG: TableConfig = {
-  name: "corrupted",
-  columns: [
-    { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
-    {
-      name: "sample_id",
-      type: "bigint",
-      generator: { kind: "randomInt", min: 1, max: ROW_COUNT },
-    },
-    {
-      name: "first_name",
-      type: "string",
-      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up
-    },
-    {
-      name: "last_name",
-      type: "string",
-      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up
-    },
-    {
-      name: "email",
-      type: "string",
-      generator: { kind: "randomString", length: 50 }, // Placeholder, will be looked up
-    },
-    {
-      name: "corrupted_first_name",
-      type: "string",
-      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up then mutated
-    },
-    {
-      name: "corrupted_last_name",
-      type: "string",
-      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up then mutated
-    },
-    {
-      name: "corrupted_email",
-      type: "string",
-      generator: { kind: "randomString", length: 50 }, // Placeholder, will be looked up then mutated
-    },
-    { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
-  ],
-};
+// Temporarily disabled for faster generation
+// const CORRUPTED_CONFIG: TableConfig = {
+//   name: "corrupted",
+//   columns: [
+//     { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
+//     {
+//       name: "sample_id",
+//       type: "bigint",
+//       generator: { kind: "randomInt", min: 1, max: ROW_COUNT },
+//     },
+//     {
+//       name: "first_name",
+//       type: "string",
+//       generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up
+//     },
+//     {
+//       name: "last_name",
+//       type: "string",
+//       generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up
+//     },
+//     {
+//       name: "email",
+//       type: "string",
+//       generator: { kind: "randomString", length: 50 }, // Placeholder, will be looked up
+//     },
+//     {
+//       name: "corrupted_first_name",
+//       type: "string",
+//       generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up then mutated
+//     },
+//     {
+//       name: "corrupted_last_name",
+//       type: "string",
+//       generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up then mutated
+//     },
+//     {
+//       name: "corrupted_email",
+//       type: "string",
+//       generator: { kind: "randomString", length: 50 }, // Placeholder, will be looked up then mutated
+//     },
+//     { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
+//   ],
+// };
 
 interface DatabaseConfig {
   name: string;
@@ -222,102 +224,103 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
     steps: [
       // Step 1: Generate categories
       { table: CATEGORIES_CONFIG, rowCount: CATEGORY_COUNT },
-      // Step 2: Generate samples with email template
-      {
-        table: TABLE_CONFIG,
-        rowCount: ROW_COUNT,
-        transformations: [
-          {
-            description: "Generate email from first_name and last_name",
-            transformations: [
-              {
-                kind: "template",
-                column: "email",
-                template: "{first_name}.{last_name}@example.com",
-                lowercase: true,
-              },
-            ],
-          },
-        ],
-      },
-      // Step 3: Generate corrupted table
-      { table: CORRUPTED_CONFIG, rowCount: ROW_COUNT },
+      // Step 2: Generate samples (email generation disabled for faster generation)
+      { table: TABLE_CONFIG, rowCount: ROW_COUNT },
+      // {
+      //   table: TABLE_CONFIG,
+      //   rowCount: ROW_COUNT,
+      //   transformations: [
+      //     {
+      //       description: "Generate email from first_name and last_name",
+      //       transformations: [
+      //         {
+      //           kind: "template",
+      //           column: "email",
+      //           template: "{first_name}.{last_name}@example.com",
+      //           lowercase: true,
+      //         },
+      //       ],
+      //     },
+      //   ],
+      // },
+      // Step 3: Generate corrupted table (disabled temporarily for faster generation)
+      // { table: CORRUPTED_CONFIG, rowCount: ROW_COUNT },
       // Step 4: Lookup values from samples to corrupted
-      {
-        tableName: "corrupted",
-        transformations: [
-          {
-            description: "Copy names and email from linked sample",
-            transformations: [
-              {
-                kind: "lookup",
-                column: "first_name",
-                fromTable: "samples",
-                fromColumn: "first_name",
-                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
-              },
-              {
-                kind: "lookup",
-                column: "last_name",
-                fromTable: "samples",
-                fromColumn: "last_name",
-                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
-              },
-              {
-                kind: "lookup",
-                column: "email",
-                fromTable: "samples",
-                fromColumn: "email",
-                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
-              },
-              {
-                kind: "lookup",
-                column: "corrupted_first_name",
-                fromTable: "samples",
-                fromColumn: "first_name",
-                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
-              },
-              {
-                kind: "lookup",
-                column: "corrupted_last_name",
-                fromTable: "samples",
-                fromColumn: "last_name",
-                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
-              },
-              {
-                kind: "lookup",
-                column: "corrupted_email",
-                fromTable: "samples",
-                fromColumn: "email",
-                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
-              },
-            ],
-          },
-          {
-            description: "Corrupt the corrupted_* columns",
-            transformations: [
-              {
-                kind: "mutate",
-                column: "corrupted_first_name",
-                probability: 0.3,
-                operations: ["replace", "delete", "insert"],
-              },
-              {
-                kind: "mutate",
-                column: "corrupted_last_name",
-                probability: 0.3,
-                operations: ["replace", "delete", "insert"],
-              },
-              {
-                kind: "mutate",
-                column: "corrupted_email",
-                probability: 0.3,
-                operations: ["replace", "delete", "insert"],
-              },
-            ],
-          },
-        ],
-      },
+      // {
+      //   tableName: "corrupted",
+      //   transformations: [
+      //     {
+      //       description: "Copy names and email from linked sample",
+      //       transformations: [
+      //         {
+      //           kind: "lookup",
+      //           column: "first_name",
+      //           fromTable: "samples",
+      //           fromColumn: "first_name",
+      //           joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+      //         },
+      //         {
+      //           kind: "lookup",
+      //           column: "last_name",
+      //           fromTable: "samples",
+      //           fromColumn: "last_name",
+      //           joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+      //         },
+      //         {
+      //           kind: "lookup",
+      //           column: "email",
+      //           fromTable: "samples",
+      //           fromColumn: "email",
+      //           joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+      //         },
+      //         {
+      //           kind: "lookup",
+      //           column: "corrupted_first_name",
+      //           fromTable: "samples",
+      //           fromColumn: "first_name",
+      //           joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+      //         },
+      //         {
+      //           kind: "lookup",
+      //           column: "corrupted_last_name",
+      //           fromTable: "samples",
+      //           fromColumn: "last_name",
+      //           joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+      //         },
+      //         {
+      //           kind: "lookup",
+      //           column: "corrupted_email",
+      //           fromTable: "samples",
+      //           fromColumn: "email",
+      //           joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+      //         },
+      //       ],
+      //     },
+      //     {
+      //       description: "Corrupt the corrupted_* columns",
+      //       transformations: [
+      //         {
+      //           kind: "mutate",
+      //           column: "corrupted_first_name",
+      //           probability: 0.3,
+      //           operations: ["replace", "delete", "insert"],
+      //         },
+      //         {
+      //           kind: "mutate",
+      //           column: "corrupted_last_name",
+      //           probability: 0.3,
+      //           operations: ["replace", "delete", "insert"],
+      //         },
+      //         {
+      //           kind: "mutate",
+      //           column: "corrupted_email",
+      //           probability: 0.3,
+      //           operations: ["replace", "delete", "insert"],
+      //         },
+      //       ],
+      //     },
+      //   ],
+      // },
     ],
   };
 
@@ -331,9 +334,9 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
       dropFirst: true,
     });
 
-    const durationSec = (result.durationMs / 1000).toFixed(1);
+    const durationStr = formatDuration(result.durationMs);
     console.log(
-      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${durationSec}s`
+      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${durationStr}`
     );
   } finally {
     await generator.disconnect();
