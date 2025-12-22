@@ -4,6 +4,10 @@
   "description": "Benchmark typical queries on Trino+Iceberg, PostgreSQL, and ClickHouse without indexes",
   "author": "Damir Manapov",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/damir-manapov/indexless-query-benchmarks"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"
