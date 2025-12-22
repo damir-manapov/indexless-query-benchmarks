@@ -6,6 +6,12 @@ Benchmark typical queries on Trino+Iceberg, PostgreSQL, and ClickHouse without i
 
 This project benchmarks query performance on tables without traditional indexes, demonstrating how columnar databases and modern storage formats handle full-scan workloads.
 
+### Assumptions
+
+We assume that query parameters — what to filter, order by, how to join tables, etc. — are dynamic and defined by the user at runtime. Thus, queries are not known beforehand and no indexes can be used in most cases.
+
+This may not be your case. You may heavily constrain what users can configure, find ways to define indexes on the fly, or have someone monitor usage and adjust indexes manually. If so, you should perform measurements with the expected indexes yourself.
+
 ### Databases Tested
 
 - **PostgreSQL** - Traditional RDBMS for baseline comparison
