@@ -41,8 +41,13 @@ export class PostgresRunner implements DatabaseRunner {
   async runQuery(query: string): Promise<{ durationMs: number; rowCount: number }> {
     if (!this.sql) throw new Error("Not connected");
     const start = Date.now();
-    const result = await this.sql.unsafe(query);
-    return { durationMs: Date.now() - start, rowCount: result.length };
+    // Use cursor to stream results without loading all into memory
+    let rowCount = 0;
+    const cursor = this.sql.unsafe(query).cursor(1000);
+    for await (const rows of cursor) {
+      rowCount += rows.length;
+    }
+    return { durationMs: Date.now() - start, rowCount };
   }
 
   async getTableSizes(): Promise<TableSize[]> {
@@ -82,8 +87,13 @@ export class ClickHouseRunner implements DatabaseRunner {
     if (!this.client) throw new Error("Not connected");
     const start = Date.now();
     const result = await this.client.query({ query, format: "JSONEachRow" });
-    const rows: unknown[] = await result.json();
-    return { durationMs: Date.now() - start, rowCount: rows.length };
+    // Stream rows to count without loading all into memory
+    let rowCount = 0;
+    const stream = result.stream();
+    for await (const rows of stream) {
+      rowCount += rows.length;
+    }
+    return { durationMs: Date.now() - start, rowCount };
   }
 
   async getTableSizes(): Promise<TableSize[]> {
@@ -165,7 +175,9 @@ export class TrinoRunner implements DatabaseRunner {
 
     const sizes: TableSize[] = [];
     for (const table of tableNames) {
-      const countResult = await this.trino.query(`SELECT COUNT(*) FROM iceberg.benchmarks.${table}`);
+      const countResult = await this.trino.query(
+        `SELECT COUNT(*) FROM iceberg.benchmarks.${table}`
+      );
       for await (const result of countResult) {
         const trinoResult = result as { error?: { message: string }; data?: unknown[][] };
         if (trinoResult.data?.[0]) {

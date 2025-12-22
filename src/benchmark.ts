@@ -138,9 +138,13 @@ async function benchmarkDatabase(runner: DatabaseRunner): Promise<DatabaseResult
     // Get table sizes
     try {
       dbResult.tableSizes = await runner.getTableSizes();
-      console.log(`Tables: ${dbResult.tableSizes.map((t) => `${t.table}(${t.rows.toLocaleString()})`).join(", ")}`);
+      console.log(
+        `Tables: ${dbResult.tableSizes.map((t) => `${t.table}(${t.rows.toLocaleString()})`).join(", ")}`
+      );
     } catch (error) {
-      console.log(`  Could not get table sizes: ${error instanceof Error ? error.message : String(error)}`);
+      console.log(
+        `  Could not get table sizes: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     for (const queryDef of queriesToRun) {
@@ -163,9 +167,9 @@ async function benchmarkDatabase(runner: DatabaseRunner): Promise<DatabaseResult
 
       const errors = results.filter((r) => r.error);
       if (errors.length > 0) {
-        console.log(`  Errors: ${String(errors.length)}/${String(results.length)}`);
+        console.error(`  Errors: ${String(errors.length)}/${String(results.length)}`);
         errors.forEach((e) => {
-          console.log(`    - ${e.error ?? "Unknown error"}`);
+          console.error(`    - ${e.error ?? "Unknown error"}`);
         });
         continue;
       }
