@@ -63,7 +63,7 @@ Options:
   --report         Generate JSON and Markdown reports in reports/
   -h, --help       Show this help message
 
-Tags: basic, join, entity-resolution, expensive
+Tags: basic, join, deduplication, matching, expensive
 
 If no database is specified, all databases are benchmarked.
 
@@ -72,7 +72,7 @@ Examples:
   pnpm benchmark --postgres --trino       # PostgreSQL and Trino only
   pnpm benchmark -q full-count -r 5       # Specific query, 5 runs
   pnpm benchmark --exclude expensive      # Skip expensive queries
-  pnpm benchmark --only entity-resolution # Only entity resolution queries
+  pnpm benchmark --only matching          # Only record matching queries
   pnpm benchmark --report                 # Generate reports
 `);
   process.exit(0);

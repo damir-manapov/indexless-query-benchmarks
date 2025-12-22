@@ -7,7 +7,8 @@ import type { QueryDefinition } from "./types.js";
  * Tags:
  * - basic: Simple single-table queries
  * - join: Queries involving JOINs
- * - entity-resolution: Duplicate detection and matching queries
+ * - deduplication: Finding duplicates within a single table
+ * - matching: Linking records between tables (or self-join)
  * - expensive: Queries that may timeout on large datasets
  */
 export const QUERIES: QueryDefinition[] = [
@@ -188,11 +189,11 @@ export const QUERIES: QueryDefinition[] = [
         "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
     },
   },
-  // Entity resolution queries - find duplicates and match corrupted records
+  // Deduplication queries - find duplicates within a single table
   {
     name: "dup-exact-name",
     description: "Find exact duplicate names (GROUP BY HAVING)",
-    tags: ["entity-resolution"],
+    tags: ["deduplication"],
     sql: {
       postgres:
         "SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name HAVING COUNT(*) > 1",
@@ -205,7 +206,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-group-size",
     description: "Distribution of duplicate group sizes",
-    tags: ["entity-resolution"],
+    tags: ["deduplication"],
     sql: {
       postgres:
         "SELECT cnt, COUNT(*) as groups FROM (SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name) sub GROUP BY cnt ORDER BY cnt",
@@ -218,7 +219,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-window-rank",
     description: "Rank duplicates within groups (window function)",
-    tags: ["entity-resolution"],
+    tags: ["deduplication"],
     sql: {
       postgres:
         "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM samples",
@@ -228,10 +229,11 @@ export const QUERIES: QueryDefinition[] = [
         "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM iceberg.benchmarks.samples",
     },
   },
+  // Matching queries - link records between tables
   {
     name: "match-exact",
     description: "Match corrupted to samples by exact email",
-    tags: ["entity-resolution"],
+    tags: ["matching"],
     sql: {
       postgres: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.email = s.email",
       clickhouse: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.email = s.email",
@@ -242,7 +244,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-corrupted-exact",
     description: "Match corrupted email to original (should find fewer)",
-    tags: ["entity-resolution"],
+    tags: ["matching"],
     sql: {
       postgres: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.corrupted_email = s.email",
       clickhouse: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.corrupted_email = s.email",
@@ -253,7 +255,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-self-join",
     description: "Self-join to find duplicate pairs",
-    tags: ["entity-resolution"],
+    tags: ["matching"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM samples a JOIN samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",
@@ -266,7 +268,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-fuzzy-levenshtein",
     description: "Fuzzy match corrupted email using Levenshtein distance <= 1",
-    tags: ["entity-resolution", "expensive"],
+    tags: ["matching", "expensive"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM corrupted c JOIN samples s ON levenshtein(c.corrupted_email, s.email) <= 1",
