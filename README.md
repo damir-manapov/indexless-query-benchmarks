@@ -35,6 +35,12 @@ This may not be your case. You may heavily constrain what users can configure, f
 - JOIN with multiple filter conditions
 - JOIN with range filter
 - JOIN with GROUP BY multiple columns
+- Entity resolution: find duplicate names
+- Entity resolution: duplicate group size distribution
+- Entity resolution: rank duplicates (window function)
+- Entity matching: exact email match
+- Entity matching: corrupted email match
+- Entity matching: self-join for duplicate pairs
 
 ## Prerequisites
 

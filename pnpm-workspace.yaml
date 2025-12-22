@@ -1,3 +1,6 @@
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild
+
+overrides:
+  "@mkven/samples-generation": link:../samples-generation

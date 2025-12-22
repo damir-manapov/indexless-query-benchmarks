@@ -5,7 +5,13 @@ import {
   TrinoDataGenerator,
   type TableConfig,
   type BaseDataGenerator,
+  type Scenario,
 } from "@mkven/samples-generation";
+import {
+  getEnglishMaleNames,
+  getEnglishFemaleNames,
+  getEnglishSurnames,
+} from "@mkven/name-dictionaries";
 
 const { values } = parseArgs({
   options: {
@@ -52,6 +58,10 @@ const CATEGORY_COUNT = 10_000;
 // If no database specified, run all
 const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
 
+// English names for realistic entity data
+const FIRST_NAMES = [...getEnglishMaleNames(), ...getEnglishFemaleNames()];
+const LAST_NAMES = getEnglishSurnames();
+
 // Categories table (small lookup table for JOIN benchmarks)
 const CATEGORIES_CONFIG: TableConfig = {
   name: "categories",
@@ -84,7 +94,21 @@ const TABLE_CONFIG: TableConfig = {
   name: "samples",
   columns: [
     { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
-    { name: "name", type: "string", generator: { kind: "randomString", length: 32 } },
+    {
+      name: "first_name",
+      type: "string",
+      generator: { kind: "choice", values: FIRST_NAMES },
+    },
+    {
+      name: "last_name",
+      type: "string",
+      generator: { kind: "choice", values: LAST_NAMES },
+    },
+    {
+      name: "email",
+      type: "string",
+      generator: { kind: "randomString", length: 50 }, // Placeholder, will be templated
+    },
     { name: "value", type: "float", generator: { kind: "randomFloat", min: 0, max: 1000 } },
     {
       name: "status",
@@ -98,6 +122,51 @@ const TABLE_CONFIG: TableConfig = {
       name: "category_id",
       type: "bigint",
       generator: { kind: "randomInt", min: 1, max: CATEGORY_COUNT },
+    },
+    { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
+  ],
+};
+
+// Corrupted table - same structure as samples, linked via sample_id
+// Will have names/emails copied from samples then corrupted
+const CORRUPTED_CONFIG: TableConfig = {
+  name: "corrupted",
+  columns: [
+    { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
+    {
+      name: "sample_id",
+      type: "bigint",
+      generator: { kind: "randomInt", min: 1, max: 1 }, // Will be set to ROW_COUNT at runtime
+    },
+    {
+      name: "first_name",
+      type: "string",
+      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up
+    },
+    {
+      name: "last_name",
+      type: "string",
+      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up
+    },
+    {
+      name: "email",
+      type: "string",
+      generator: { kind: "randomString", length: 50 }, // Placeholder, will be looked up
+    },
+    {
+      name: "corrupted_first_name",
+      type: "string",
+      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up then mutated
+    },
+    {
+      name: "corrupted_last_name",
+      type: "string",
+      generator: { kind: "randomString", length: 30 }, // Placeholder, will be looked up then mutated
+    },
+    {
+      name: "corrupted_email",
+      type: "string",
+      generator: { kind: "randomString", length: 50 }, // Placeholder, will be looked up then mutated
     },
     { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
   ],
@@ -148,26 +217,133 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
   console.log(`\n=== ${config.name} ===`);
   const generator = config.createGenerator();
 
+  // Update corrupted table's sample_id range based on actual row count
+  const corruptedConfig: TableConfig = {
+    ...CORRUPTED_CONFIG,
+    columns: CORRUPTED_CONFIG.columns.map((col) =>
+      col.name === "sample_id"
+        ? { ...col, generator: { kind: "randomInt" as const, min: 1, max: ROW_COUNT } }
+        : col
+    ),
+  };
+
+  const scenario: Scenario = {
+    name: "Entity resolution benchmark",
+    steps: [
+      // Step 1: Generate categories
+      { table: CATEGORIES_CONFIG, rowCount: CATEGORY_COUNT },
+      // Step 2: Generate samples with email template
+      {
+        table: TABLE_CONFIG,
+        rowCount: ROW_COUNT,
+        transformations: [
+          {
+            description: "Generate email from first_name and last_name",
+            transformations: [
+              {
+                kind: "template",
+                column: "email",
+                template: "{first_name}.{last_name}@example.com",
+                lowercase: true,
+              },
+            ],
+          },
+        ],
+      },
+      // Step 3: Generate corrupted table
+      { table: corruptedConfig, rowCount: ROW_COUNT },
+      // Step 4: Lookup values from samples to corrupted
+      {
+        tableName: "corrupted",
+        transformations: [
+          {
+            description: "Copy names and email from linked sample",
+            transformations: [
+              {
+                kind: "lookup",
+                column: "first_name",
+                fromTable: "samples",
+                fromColumn: "first_name",
+                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+              },
+              {
+                kind: "lookup",
+                column: "last_name",
+                fromTable: "samples",
+                fromColumn: "last_name",
+                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+              },
+              {
+                kind: "lookup",
+                column: "email",
+                fromTable: "samples",
+                fromColumn: "email",
+                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+              },
+              {
+                kind: "lookup",
+                column: "corrupted_first_name",
+                fromTable: "samples",
+                fromColumn: "first_name",
+                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+              },
+              {
+                kind: "lookup",
+                column: "corrupted_last_name",
+                fromTable: "samples",
+                fromColumn: "last_name",
+                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+              },
+              {
+                kind: "lookup",
+                column: "corrupted_email",
+                fromTable: "samples",
+                fromColumn: "email",
+                joinOn: { targetColumn: "sample_id", lookupColumn: "id" },
+              },
+            ],
+          },
+          {
+            description: "Corrupt the corrupted_* columns",
+            transformations: [
+              {
+                kind: "mutate",
+                column: "corrupted_first_name",
+                probability: 0.3,
+                operations: ["replace", "delete", "insert"],
+              },
+              {
+                kind: "mutate",
+                column: "corrupted_last_name",
+                probability: 0.3,
+                operations: ["replace", "delete", "insert"],
+              },
+              {
+                kind: "mutate",
+                column: "corrupted_email",
+                probability: 0.3,
+                operations: ["replace", "delete", "insert"],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
   try {
     await generator.connect();
 
-    // Generate categories first
-    console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
-    await generator.generate({
-      table: CATEGORIES_CONFIG,
-      rowCount: CATEGORY_COUNT,
-      batchSize: CATEGORY_COUNT,
-      dropFirst: true,
-    });
-
-    // Generate samples
-    const result = await generator.generate({
-      table: TABLE_CONFIG,
-      rowCount: ROW_COUNT,
+    console.log(`Generating ${ROW_COUNT.toLocaleString()} rows per table...`);
+    const result = await generator.runScenario({
+      scenario,
       batchSize: BATCH_SIZE,
       dropFirst: true,
     });
-    console.log(`Generated ${String(result.rowsInserted)} rows in ${String(result.durationMs)}ms`);
+
+    console.log(
+      `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${String(result.durationMs)}ms`
+    );
   } finally {
     await generator.disconnect();
   }

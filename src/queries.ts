@@ -54,9 +54,9 @@ export const QUERIES: QueryDefinition[] = [
     name: "string-like",
     description: "String pattern matching (full scan)",
     sql: {
-      postgres: "SELECT COUNT(*) FROM samples WHERE name LIKE '%abc%'",
-      clickhouse: "SELECT COUNT(*) FROM samples WHERE name LIKE '%abc%'",
-      trino: "SELECT COUNT(*) FROM iceberg.benchmarks.samples WHERE name LIKE '%abc%'",
+      postgres: "SELECT COUNT(*) FROM samples WHERE first_name LIKE '%an%'",
+      clickhouse: "SELECT COUNT(*) FROM samples WHERE first_name LIKE '%an%'",
+      trino: "SELECT COUNT(*) FROM iceberg.benchmarks.samples WHERE first_name LIKE '%an%'",
     },
   },
   {
@@ -101,9 +101,9 @@ export const QUERIES: QueryDefinition[] = [
     name: "dedupe",
     description: "Select distinct rows by multiple columns",
     sql: {
-      postgres: "SELECT DISTINCT status, name FROM samples",
-      clickhouse: "SELECT DISTINCT status, name FROM samples",
-      trino: "SELECT DISTINCT status, name FROM iceberg.benchmarks.samples",
+      postgres: "SELECT DISTINCT first_name, last_name FROM samples",
+      clickhouse: "SELECT DISTINCT first_name, last_name FROM samples",
+      trino: "SELECT DISTINCT first_name, last_name FROM iceberg.benchmarks.samples",
     },
   },
   {
@@ -164,6 +164,75 @@ export const QUERIES: QueryDefinition[] = [
         "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
       trino:
         "SELECT c.priority, c.region, COUNT(*), AVG(s.value) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id GROUP BY c.priority, c.region",
+    },
+  },
+  // Entity resolution queries - find duplicates and match corrupted records
+  {
+    name: "dup-exact-name",
+    description: "Find exact duplicate names (GROUP BY HAVING)",
+    sql: {
+      postgres:
+        "SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name HAVING COUNT(*) > 1",
+      clickhouse:
+        "SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name HAVING COUNT(*) > 1",
+      trino:
+        "SELECT first_name, last_name, COUNT(*) as cnt FROM iceberg.benchmarks.samples GROUP BY first_name, last_name HAVING COUNT(*) > 1",
+    },
+  },
+  {
+    name: "dup-group-size",
+    description: "Distribution of duplicate group sizes",
+    sql: {
+      postgres:
+        "SELECT cnt, COUNT(*) as groups FROM (SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name) sub GROUP BY cnt ORDER BY cnt",
+      clickhouse:
+        "SELECT cnt, COUNT(*) as groups FROM (SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name) GROUP BY cnt ORDER BY cnt",
+      trino:
+        "SELECT cnt, COUNT(*) as groups FROM (SELECT first_name, last_name, COUNT(*) as cnt FROM iceberg.benchmarks.samples GROUP BY first_name, last_name) sub GROUP BY cnt ORDER BY cnt",
+    },
+  },
+  {
+    name: "dup-window-rank",
+    description: "Rank duplicates within groups (window function)",
+    sql: {
+      postgres:
+        "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM samples",
+      clickhouse:
+        "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM samples",
+      trino:
+        "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM iceberg.benchmarks.samples",
+    },
+  },
+  {
+    name: "match-exact",
+    description: "Match corrupted to samples by exact email",
+    sql: {
+      postgres: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.email = s.email",
+      clickhouse: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.email = s.email",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.corrupted c JOIN iceberg.benchmarks.samples s ON c.email = s.email",
+    },
+  },
+  {
+    name: "match-corrupted-exact",
+    description: "Match corrupted email to original (should find fewer)",
+    sql: {
+      postgres: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.corrupted_email = s.email",
+      clickhouse: "SELECT COUNT(*) FROM corrupted c JOIN samples s ON c.corrupted_email = s.email",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.corrupted c JOIN iceberg.benchmarks.samples s ON c.corrupted_email = s.email",
+    },
+  },
+  {
+    name: "match-self-join",
+    description: "Self-join to find duplicate pairs",
+    sql: {
+      postgres:
+        "SELECT COUNT(*) FROM samples a JOIN samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",
+      clickhouse:
+        "SELECT COUNT(*) FROM samples a JOIN samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.samples a JOIN iceberg.benchmarks.samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",
     },
   },
 ];
