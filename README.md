@@ -118,29 +118,6 @@ pnpm compose:reset
 | MinIO      | 9000 (S3), 9001 (console)  | minioadmin:minioadmin | -                  |
 | Nessie     | 19120                      | -                     | -                  |
 
-## Sample Results (1M rows)
-
-| Query                     | PostgreSQL | ClickHouse | Trino/Iceberg |
-| ------------------------- | ---------- | ---------- | ------------- |
-| full-count                | 15ms       | 3ms        | 114ms         |
-| filter-by-status          | 19ms       | 11ms       | 149ms         |
-| aggregate-by-status       | 39ms       | 16ms       | 190ms         |
-| range-scan                | 20ms       | 6ms        | 126ms         |
-| top-n                     | 18ms       | 13ms       | 210ms         |
-| string-like               | 36ms       | 7ms        | 201ms         |
-| distinct-count            | 130ms      | 10ms       | 165ms         |
-| percentile                | 216ms      | 7ms        | 233ms         |
-| pagination-offset         | 0ms        | 4ms        | 129ms         |
-| pagination-offset-ordered | 46ms       | 10ms       | 258ms         |
-| dedupe                    | 633ms      | 448ms      | 1.97s         |
-| filter-join               | 41ms       | 8ms        | 207ms         |
-| aggregate-join            | 78ms       | 11ms       | 202ms         |
-| join-multi-filter         | 30ms       | 7ms        | 166ms         |
-| join-range-filter         | 41ms       | 8ms        | 174ms         |
-| join-group-multi          | 100ms      | 18ms       | 224ms         |
-
-> Note: Trino has higher latency due to distributed query overhead. The differences become more pronounced with larger datasets.
-
 ## Development
 
 ```bash
