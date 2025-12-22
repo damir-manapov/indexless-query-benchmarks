@@ -46,12 +46,27 @@ function parseNumber(value: string): number {
 
 const ROW_COUNT = parseNumber(values.rows);
 const BATCH_SIZE = values.batch ? parseNumber(values.batch) : 10_000_000;
+const CATEGORY_COUNT = 10_000;
 
 // If no database specified, run all
 const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
 const runPostgres = values.postgres || noDbSelected;
 const runClickHouse = values.clickhouse || noDbSelected;
 const runTrino = values.trino || noDbSelected;
+
+// Categories table (small lookup table for JOIN benchmarks)
+const CATEGORIES_CONFIG: TableConfig = {
+  name: "categories",
+  columns: [
+    { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
+    { name: "name", type: "string", generator: { kind: "randomString", length: 20 } },
+    {
+      name: "priority",
+      type: "string",
+      generator: { kind: "choice", values: ["low", "medium", "high", "critical"] },
+    },
+  ],
+};
 
 // Table schema matching the benchmark queries
 const TABLE_CONFIG: TableConfig = {
@@ -67,6 +82,11 @@ const TABLE_CONFIG: TableConfig = {
         kind: "choice",
         values: ["active", "inactive", "pending", "completed"],
       },
+    },
+    {
+      name: "category_id",
+      type: "bigint",
+      generator: { kind: "randomInt", min: 1, max: CATEGORY_COUNT },
     },
     { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
   ],
@@ -84,6 +104,17 @@ async function generatePostgres(): Promise<void> {
 
   try {
     await generator.connect();
+
+    // Generate categories first
+    console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
+    await generator.generate({
+      table: CATEGORIES_CONFIG,
+      rowCount: CATEGORY_COUNT,
+      batchSize: CATEGORY_COUNT,
+      dropFirst: true,
+    });
+
+    // Generate samples
     const result = await generator.generate({
       table: TABLE_CONFIG,
       rowCount: ROW_COUNT,
@@ -108,6 +139,17 @@ async function generateClickHouse(): Promise<void> {
 
   try {
     await generator.connect();
+
+    // Generate categories first
+    console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
+    await generator.generate({
+      table: CATEGORIES_CONFIG,
+      rowCount: CATEGORY_COUNT,
+      batchSize: CATEGORY_COUNT,
+      dropFirst: true,
+    });
+
+    // Generate samples
     const result = await generator.generate({
       table: TABLE_CONFIG,
       rowCount: ROW_COUNT,
@@ -134,6 +176,16 @@ async function generateTrino(): Promise<void> {
     await generator.connect();
     // Schema is created automatically by connect()
 
+    // Generate categories first
+    console.log(`Generating categories (${CATEGORY_COUNT.toLocaleString()} rows)...`);
+    await generator.generate({
+      table: CATEGORIES_CONFIG,
+      rowCount: CATEGORY_COUNT,
+      batchSize: CATEGORY_COUNT,
+      dropFirst: true,
+    });
+
+    // Generate samples
     const result = await generator.generate({
       table: TABLE_CONFIG,
       rowCount: ROW_COUNT,

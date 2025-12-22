@@ -106,4 +106,28 @@ export const QUERIES: QueryDefinition[] = [
       trino: "SELECT DISTINCT status, name FROM iceberg.benchmarks.samples",
     },
   },
+  {
+    name: "filter-join",
+    description: "Filter with JOIN on lookup table",
+    sql: {
+      postgres:
+        "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.priority = 'high'",
+      clickhouse:
+        "SELECT COUNT(*) FROM samples s JOIN categories c ON s.category_id = c.id WHERE c.priority = 'high'",
+      trino:
+        "SELECT COUNT(*) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id WHERE c.priority = 'high'",
+    },
+  },
+  {
+    name: "aggregate-join",
+    description: "Aggregate with JOIN on lookup table",
+    sql: {
+      postgres:
+        "SELECT c.priority, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority",
+      clickhouse:
+        "SELECT c.priority, COUNT(*), AVG(s.value) FROM samples s JOIN categories c ON s.category_id = c.id GROUP BY c.priority",
+      trino:
+        "SELECT c.priority, COUNT(*), AVG(s.value) FROM iceberg.benchmarks.samples s JOIN iceberg.benchmarks.categories c ON s.category_id = c.id GROUP BY c.priority",
+    },
+  },
 ];

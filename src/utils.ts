@@ -2,7 +2,7 @@
  * Format duration in milliseconds to human-readable string
  */
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 1000) return `${String(Math.round(ms))}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(2)}s`;
   if (ms < 3600_000) {
     const minutes = Math.floor(ms / 60_000);
