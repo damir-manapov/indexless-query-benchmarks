@@ -39,10 +39,15 @@ Examples:
   process.exit(0);
 }
 
-const ROW_COUNT = parseInt(values.rows, 10);
-const BATCH_SIZE_PG = values.batch ? parseInt(values.batch, 10) : 1_000_000;
-const BATCH_SIZE_CH = values.batch ? parseInt(values.batch, 10) : 100_000_000;
-const BATCH_SIZE_TRINO = values.batch ? parseInt(values.batch, 10) : 100_000_000;
+// Parse number with underscore separators (e.g., 1_000_000)
+function parseNumber(value: string): number {
+  return parseInt(value.replace(/_/g, ""), 10);
+}
+
+const ROW_COUNT = parseNumber(values.rows);
+const BATCH_SIZE_PG = values.batch ? parseNumber(values.batch) : 1_000_000;
+const BATCH_SIZE_CH = values.batch ? parseNumber(values.batch) : 100_000_000;
+const BATCH_SIZE_TRINO = values.batch ? parseNumber(values.batch) : 100_000_000;
 
 // If no database specified, run all
 const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
