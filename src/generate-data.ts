@@ -107,7 +107,7 @@ const TABLE_CONFIG: TableConfig = {
     {
       name: "email",
       type: "string",
-      generator: { kind: "randomString", length: 50 }, // Placeholder, will be templated
+      generator: { kind: "constant", value: "" }, // Placeholder, will be templated
     },
     { name: "value", type: "float", generator: { kind: "randomFloat", min: 0, max: 1000 } },
     {
@@ -136,7 +136,7 @@ const CORRUPTED_CONFIG: TableConfig = {
     {
       name: "sample_id",
       type: "bigint",
-      generator: { kind: "randomInt", min: 1, max: 1 }, // Will be set to ROW_COUNT at runtime
+      generator: { kind: "randomInt", min: 1, max: ROW_COUNT },
     },
     {
       name: "first_name",
@@ -217,16 +217,6 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
   console.log(`\n=== ${config.name} ===`);
   const generator = config.createGenerator();
 
-  // Update corrupted table's sample_id range based on actual row count
-  const corruptedConfig: TableConfig = {
-    ...CORRUPTED_CONFIG,
-    columns: CORRUPTED_CONFIG.columns.map((col) =>
-      col.name === "sample_id"
-        ? { ...col, generator: { kind: "randomInt" as const, min: 1, max: ROW_COUNT } }
-        : col
-    ),
-  };
-
   const scenario: Scenario = {
     name: "Entity resolution benchmark",
     steps: [
@@ -251,7 +241,7 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
         ],
       },
       // Step 3: Generate corrupted table
-      { table: corruptedConfig, rowCount: ROW_COUNT },
+      { table: CORRUPTED_CONFIG, rowCount: ROW_COUNT },
       // Step 4: Lookup values from samples to corrupted
       {
         tableName: "corrupted",
