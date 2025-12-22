@@ -30,8 +30,11 @@ This may not be your case. You may heavily constrain what users can configure, f
 - Percentile calculations
 - Deep pagination (OFFSET)
 - Deduplication (SELECT DISTINCT)
-- Filter with JOIN on lookup table
-- Aggregate with JOIN on lookup table
+- JOIN with filter on lookup table
+- JOIN with aggregate on lookup table
+- JOIN with multiple filter conditions
+- JOIN with range filter
+- JOIN with GROUP BY multiple columns
 
 ## Prerequisites
 
@@ -119,19 +122,22 @@ pnpm compose:reset
 
 | Query                     | PostgreSQL | ClickHouse | Trino/Iceberg |
 | ------------------------- | ---------- | ---------- | ------------- |
-| full-count                | 13ms       | 3ms        | 88ms          |
-| filter-by-status          | 21ms       | 7ms        | 118ms         |
-| aggregate-by-status       | 39ms       | 14ms       | 146ms         |
-| range-scan                | 20ms       | 6ms        | 130ms         |
-| top-n                     | 19ms       | 12ms       | 195ms         |
-| string-like               | 36ms       | 6ms        | 207ms         |
-| distinct-count            | 127ms      | 10ms       | 154ms         |
-| percentile                | 209ms      | 7ms        | 247ms         |
-| pagination-offset         | 0ms        | 5ms        | 115ms         |
-| pagination-offset-ordered | 40ms       | 10ms       | 259ms         |
-| dedupe                    | 559ms      | 464ms      | 1.98s         |
-| filter-join               | 37ms       | 7ms        | 182ms         |
-| aggregate-join            | 75ms       | 12ms       | 180ms         |
+| full-count                | 15ms       | 3ms        | 114ms         |
+| filter-by-status          | 19ms       | 11ms       | 149ms         |
+| aggregate-by-status       | 39ms       | 16ms       | 190ms         |
+| range-scan                | 20ms       | 6ms        | 126ms         |
+| top-n                     | 18ms       | 13ms       | 210ms         |
+| string-like               | 36ms       | 7ms        | 201ms         |
+| distinct-count            | 130ms      | 10ms       | 165ms         |
+| percentile                | 216ms      | 7ms        | 233ms         |
+| pagination-offset         | 0ms        | 4ms        | 129ms         |
+| pagination-offset-ordered | 46ms       | 10ms       | 258ms         |
+| dedupe                    | 633ms      | 448ms      | 1.97s         |
+| filter-join               | 41ms       | 8ms        | 207ms         |
+| aggregate-join            | 78ms       | 11ms       | 202ms         |
+| join-multi-filter         | 30ms       | 7ms        | 166ms         |
+| join-range-filter         | 41ms       | 8ms        | 174ms         |
+| join-group-multi          | 100ms      | 18ms       | 224ms         |
 
 > Note: Trino has higher latency due to distributed query overhead. The differences become more pronounced with larger datasets.
 
