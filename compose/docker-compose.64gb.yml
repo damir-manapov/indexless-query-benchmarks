@@ -1,0 +1,15 @@
+# Memory settings for 64GB machines (one database at a time)
+services:
+  postgres:
+    mem_limit: 64g
+
+  clickhouse:
+    mem_limit: 64g
+
+  trino:
+    mem_limit: 64g
+    volumes:
+      - ./trino/config.64gb.properties:/etc/trino/config.properties:ro
+      - ./trino/jvm.64gb.config:/etc/trino/jvm.config:ro
+      - ./trino/exchange-manager.properties:/etc/trino/exchange-manager.properties:ro
+      - ./trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro

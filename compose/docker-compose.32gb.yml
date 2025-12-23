@@ -1,0 +1,15 @@
+# Memory settings for 32GB machines (one database at a time)
+services:
+  postgres:
+    mem_limit: 32g
+
+  clickhouse:
+    mem_limit: 32g
+
+  trino:
+    mem_limit: 32g
+    volumes:
+      - ./trino/config.32gb.properties:/etc/trino/config.properties:ro
+      - ./trino/jvm.32gb.config:/etc/trino/jvm.config:ro
+      - ./trino/exchange-manager.properties:/etc/trino/exchange-manager.properties:ro
+      - ./trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
