@@ -3,10 +3,18 @@
 # Or: pnpm compose:up:minio-cluster
 
 services:
-  # Disable single-node minio from base config
+  # Override single-node minio to be a dummy that waits for cluster
   minio:
-    profiles:
-      - disabled
+    image: busybox:1.37
+    command: ["sh", "-c", "echo 'MinIO cluster mode - use minio1-4' && sleep infinity"]
+    depends_on:
+      minio1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 5s
+      timeout: 5s
+      retries: 1
 
   minio1:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
@@ -73,6 +81,8 @@ services:
 
   create-minio-bucket:
     depends_on:
+      minio:
+        condition: service_healthy
       minio1:
         condition: service_healthy
       minio2:

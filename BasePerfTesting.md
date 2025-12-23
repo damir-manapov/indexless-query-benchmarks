@@ -1,4 +1,3 @@
-
 # S3 (Warp)
 
 ## Install
@@ -13,14 +12,29 @@ warp --version
 ## Mixed test
 
 ```sh
-warp mixed --host=localhost:9000 --access-key=minioadmin --secret-key=minioadmin --autoterm
+# Local
+warp mixed \
+  --host=localhost:9000 \
+  --access-key=minioadmin \
+  --secret-key=minioadmin \
+  --autoterm
+
+# Remote (Selectel Cloud Storage)
+warp mixed \
+  --host s3.ru-7.storage.selcloud.ru:443 \
+  --access-key "$S3_ACCESS_KEY" \
+  --secret-key "$S3_SECRET_KEY" \
+  --bucket my-test-bench \
+  --region ru-7 \
+  --tls \
+  --autoterm
 ```
 
 ## Examples of measurements
 
-One node setup by compose
+### One node minio setup by compose
 
-### 12 cpu (AMD EPYC 7763 64-Core Processor), 96 ram, fast ssd (25k/15k iops, 500mbs) - selectel
+**12 cpu (AMD EPYC 7763 64-Core Processor), 96 ram, fast ssd (25k/15k iops, 500mbs) - selectel**
 
 Report: PUT. Average: 498.80 MiB/s, 49.88 obj/s
 
@@ -28,7 +42,7 @@ Report: GET. Average: 1498.55 MiB/s, 149.85 obj/s
 
 Report: Total. Average: 1997.34 MiB/s, 332.96 obj/s
 
-### The same, but universal-2 ssd (up to 16k iops, 200mbs) - selectel
+**The same, but universal-2 ssd (up to 16k iops, 200mbs) - selectel**
 
 Report: GET. Average: 592.90 MiB/s, 59.29 obj/s
 
@@ -36,17 +50,25 @@ Report: PUT. Average: 197.60 MiB/s, 19.76 obj/s
 
 Report: Total. Average: 790.50 MiB/s, 131.76 obj/s
 
-### The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel
+**The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel**
 
 TBD
 
-### The same, but base ssd (640/320 iops, 150mbs) - selectel
+**The same, but base ssd (640/320 iops, 150mbs) - selectel**
 
 TBD
 
-### The same, but base hdd (320/120 iops, 100mbs) - selectel
+**The same, but base hdd (320/120 iops, 100mbs) - selectel**
 
 TBD
+
+### Cloud selectel S3
+
+Report: GET. Average: 616.06 MiB/s, 61.61 obj/s
+
+Report: PUT. Average: 204.26 MiB/s, 20.43 obj/s
+
+Report: Total. Average: 820.33 MiB/s, 135.97 obj/s
 
 # Disk (fio)
 
@@ -73,7 +95,7 @@ TBD
 ### The same, but universal-2 ssd (up to 16k iops, 200mbs) - selectel
 
 read: IOPS=2029, BW=8116KiB/s (8311kB/s)(476MiB/60001msec)
-  lat (usec): min=221, max=65621, avg=1969.78, stdev=7449.81
+lat (usec): min=221, max=65621, avg=1969.78, stdev=7449.81
 
 ### The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel
 

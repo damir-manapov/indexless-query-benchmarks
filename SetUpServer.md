@@ -1,4 +1,3 @@
-
 # Set up temporary short living host
 
 ```sh
