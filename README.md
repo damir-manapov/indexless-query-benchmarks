@@ -57,13 +57,31 @@ This may not be your case. You may heavily constrain what users can configure, f
 
 ## Measurements of data generation
 
-All set up done by compose file, minio used os s3 storage.
+All set up done by compose file, minio used as s3 storage.
 
-### Generated entity
+### Generated entity in Trino
 
 Different count of rows for main table by 100m batches. Id, first, last name from eng dictionaries, float, status, datetime.
 
-### 12 cpu, 96 ram, fast ssd (selectel)
+### 12 cpu (AMD EPYC 7763 64-Core Processor), 96 ram, fast ssd (25k/15k iops, 500mbs) - selectel
+
+300m total, 100m batch ~56s in 3m 2s, 1,741,988 r/s
+
+600m total, 100m batch ~56s in 6m 6s, 1,721,467 r/s
+
+So writing is definetly linear. It was expected, but worth to check anyway.
+
+### The same, but universal-2 ssd (up to 16k iops, 200mbs) - selectel
+
+300m total, 100m batch ~1m 18s in 4m 14s, 1,253,772 r/s r/s
+
+600m total, 100m batch ~1m 18s in 8m 17s, 1,274,608 r/s
+
+### The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel
+
+### The same, but base ssd (640/320 iops, 150mbs) - selectel
+
+### The same, but base hdd (320/120 iops, 100mbs) - selectel
 
 ## Prerequisites
 
