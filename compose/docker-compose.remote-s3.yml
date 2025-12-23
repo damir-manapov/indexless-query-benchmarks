@@ -32,6 +32,8 @@ services:
     volumes:
       # Override catalog config to use remote S3
       - ./trino/catalog/iceberg.remote-s3.properties:/etc/trino/catalog/iceberg.properties:ro
+      # Override exchange manager to use remote S3
+      - ./trino/exchange-manager.remote-s3.properties:/etc/trino/exchange-manager.properties:ro
     depends_on:
       nessie:
         condition: service_healthy
