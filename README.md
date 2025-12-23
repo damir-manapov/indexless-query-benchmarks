@@ -139,6 +139,24 @@ pnpm compose:up:trino:minio-cluster
 pnpm compose:up:trino:64gb:minio-cluster
 ```
 
+#### Remote S3 Storage
+
+To use external S3 storage (e.g., Selectel Cloud Storage) instead of local MinIO:
+
+```bash
+# Set credentials
+export S3_ACCESS_KEY=your-access-key
+export S3_SECRET_KEY=your-secret-key
+
+# Start Trino with remote S3
+pnpm compose:up:trino:remote-s3
+
+# Or with 64GB memory config
+pnpm compose:up:trino:64gb:remote-s3
+```
+
+Edit `compose/trino/catalog/iceberg.remote-s3.properties` to configure your S3 endpoint, region, and bucket.
+
 ### Generate Test Data
 
 ```bash
