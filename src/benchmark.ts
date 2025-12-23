@@ -347,7 +347,9 @@ function generateMarkdown(report: BenchmarkReport): string {
 
   // Errors section
   const allErrors = report.databases.flatMap((db) =>
-    db.results.filter((r) => r.error).map((r) => ({ database: db.database, query: r.query, error: r.error }))
+    db.results
+      .filter((r) => r.error)
+      .map((r) => ({ database: db.database, query: r.query, error: r.error }))
   );
   if (allErrors.length > 0) {
     lines.push("## Errors");
