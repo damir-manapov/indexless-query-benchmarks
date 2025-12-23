@@ -55,6 +55,16 @@ This may not be your case. You may heavily constrain what users can configure, f
 - Self-join to find duplicate pairs
 - Fuzzy match using Levenshtein distance (expensive)
 
+## Measurements of data generation
+
+All set up done by compose file, minio used os s3 storage.
+
+### Generated entity
+
+Different count of rows for main table by 100m batches. Id, first, last name from eng dictionaries, float, status, datetime.
+
+### 12 cpu, 96 ram, fast ssd (selectel)
+
 ## Prerequisites
 
 - Node.js 20+

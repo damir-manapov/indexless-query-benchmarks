@@ -89,7 +89,7 @@ function parseNumber(value: string): number {
 
 const ROW_COUNT = parseNumber(values.rows);
 const BATCH_SIZE = values.batch ? parseNumber(values.batch) : 10_000_000;
-const CATEGORY_COUNT = 10_000;
+// const CATEGORY_COUNT = 10_000;
 
 // If no database specified, run all
 const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
@@ -98,32 +98,32 @@ const noDbSelected = !values.postgres && !values.clickhouse && !values.trino;
 const FIRST_NAMES = [...getEnglishMaleNames(), ...getEnglishFemaleNames()];
 const LAST_NAMES = getEnglishSurnames();
 
-// Categories table (small lookup table for JOIN benchmarks)
-const CATEGORIES_CONFIG: TableConfig = {
-  name: "categories",
-  columns: [
-    { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
-    { name: "name", type: "string", generator: { kind: "randomString", length: 20 } },
-    { name: "code", type: "string", generator: { kind: "randomString", length: 6 } },
-    {
-      name: "priority",
-      type: "string",
-      generator: { kind: "choice", values: ["low", "medium", "high", "critical"] },
-    },
-    {
-      name: "region",
-      type: "string",
-      generator: { kind: "choice", values: ["north", "south", "east", "west", "central"] },
-    },
-    { name: "weight", type: "float", generator: { kind: "randomFloat", min: 0, max: 100 } },
-    {
-      name: "is_active",
-      type: "integer",
-      generator: { kind: "randomInt", min: 0, max: 1 },
-    },
-    { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
-  ],
-};
+// // Categories table (small lookup table for JOIN benchmarks)
+// const CATEGORIES_CONFIG: TableConfig = {
+//   name: "categories",
+//   columns: [
+//     { name: "id", type: "bigint", generator: { kind: "sequence", start: 1 } },
+//     { name: "name", type: "string", generator: { kind: "randomString", length: 20 } },
+//     { name: "code", type: "string", generator: { kind: "randomString", length: 6 } },
+//     {
+//       name: "priority",
+//       type: "string",
+//       generator: { kind: "choice", values: ["low", "medium", "high", "critical"] },
+//     },
+//     {
+//       name: "region",
+//       type: "string",
+//       generator: { kind: "choice", values: ["north", "south", "east", "west", "central"] },
+//     },
+//     { name: "weight", type: "float", generator: { kind: "randomFloat", min: 0, max: 100 } },
+//     {
+//       name: "is_active",
+//       type: "integer",
+//       generator: { kind: "randomInt", min: 0, max: 1 },
+//     },
+//     { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
+//   ],
+// };
 
 // Table schema matching the benchmark queries
 const TABLE_CONFIG: TableConfig = {
@@ -140,11 +140,11 @@ const TABLE_CONFIG: TableConfig = {
       type: "string",
       generator: { kind: "choice", values: LAST_NAMES },
     },
-    {
-      name: "email",
-      type: "string",
-      generator: { kind: "constant", value: "" }, // Placeholder, will be templated
-    },
+    // {
+    //   name: "email",
+    //   type: "string",
+    //   generator: { kind: "constant", value: "" }, // Placeholder, will be templated
+    // },
     { name: "value", type: "float", generator: { kind: "randomFloat", min: 0, max: 1000 } },
     {
       name: "status",
@@ -154,11 +154,11 @@ const TABLE_CONFIG: TableConfig = {
         values: ["active", "inactive", "pending", "completed"],
       },
     },
-    {
-      name: "category_id",
-      type: "bigint",
-      generator: { kind: "randomInt", min: 1, max: CATEGORY_COUNT },
-    },
+    // {
+    //   name: "category_id",
+    //   type: "bigint",
+    //   generator: { kind: "randomInt", min: 1, max: CATEGORY_COUNT },
+    // },
     { name: "created_at", type: "datetime", generator: { kind: "datetime" } },
   ],
 };
@@ -257,8 +257,8 @@ async function generateForDatabase(config: DatabaseConfig): Promise<DatabaseGene
   const scenario: Scenario = {
     name: "Entity resolution benchmark",
     steps: [
-      // Step 1: Generate categories
-      { table: CATEGORIES_CONFIG, rowCount: CATEGORY_COUNT },
+      // // Step 1: Generate categories
+      // { table: CATEGORIES_CONFIG, rowCount: CATEGORY_COUNT },
       // Step 2: Generate samples (email generation disabled for faster generation)
       { table: TABLE_CONFIG, rowCount: ROW_COUNT },
       // {
