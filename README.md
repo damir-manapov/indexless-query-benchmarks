@@ -124,6 +124,21 @@ pnpm compose:up:clickhouse:64gb
 pnpm compose:up:trino:64gb
 ```
 
+#### MinIO Cluster Mode
+
+For higher S3 throughput, run MinIO in distributed mode with 4 nodes:
+
+```bash
+# Start MinIO cluster (4 nodes)
+pnpm compose:up:minio-cluster
+
+# Start Trino with MinIO cluster backend
+pnpm compose:up:trino:minio-cluster
+
+# Start Trino 64GB with MinIO cluster
+pnpm compose:up:trino:64gb:minio-cluster
+```
+
 ### Generate Test Data
 
 ```bash

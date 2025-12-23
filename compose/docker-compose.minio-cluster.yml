@@ -1,0 +1,102 @@
+# MinIO distributed cluster mode with 4 nodes
+# Usage: docker compose -f docker-compose.yml -f docker-compose.minio-cluster.yml up -d
+# Or: pnpm compose:up:minio-cluster
+
+services:
+  # Disable single-node minio from base config
+  minio:
+    profiles:
+      - disabled
+
+  minio1:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    hostname: minio1
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio1_data:/data
+
+  minio2:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    hostname: minio2
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio2_data:/data
+
+  minio3:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    hostname: minio3
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio3_data:/data
+
+  minio4:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    hostname: minio4
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server http://minio{1...4}/data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio4_data:/data
+
+  create-minio-bucket:
+    depends_on:
+      minio1:
+        condition: service_healthy
+      minio2:
+        condition: service_healthy
+      minio3:
+        condition: service_healthy
+      minio4:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio1:9000 minioadmin minioadmin;
+      mc mb --ignore-existing myminio/warehouse;
+      exit 0;
+      "
+
+  trino:
+    depends_on:
+      create-minio-bucket:
+        condition: service_completed_successfully
+      nessie:
+        condition: service_healthy
+
+volumes:
+  minio1_data:
+  minio2_data:
+  minio3_data:
+  minio4_data:
