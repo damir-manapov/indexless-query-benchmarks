@@ -9,7 +9,12 @@ import {
   type DatabaseRunner,
 } from "./runners.js";
 import { QUERIES } from "./queries.js";
-import { formatDuration, calculateStats } from "./utils.js";
+import {
+  formatDuration,
+  calculateStats,
+  getEnvironmentInfo,
+  type EnvironmentInfo,
+} from "./utils.js";
 
 interface QueryResult {
   query: string;
@@ -35,6 +40,7 @@ interface DatabaseResult {
 interface BenchmarkReport {
   timestamp: string;
   command: string;
+  environment: EnvironmentInfo;
   warmupRuns: number;
   benchmarkRuns: number;
   databases: DatabaseResult[];
@@ -48,8 +54,9 @@ const { values } = parseArgs({
     warmup: { type: "string", default: "1" },
     runs: { type: "string", short: "r", default: "3" },
     query: { type: "string", short: "q" },
-    exclude: { type: "string", short: "e" },
+    exclude: { type: "string", short: "x" },
     only: { type: "string", short: "o" },
+    env: { type: "string", short: "e" },
     report: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -66,8 +73,9 @@ Options:
   --warmup <n>     Number of warmup runs (default: 1)
   -r, --runs <n>   Number of benchmark runs (default: 3)
   -q, --query <n>  Run specific query by name
-  -e, --exclude <tag>  Exclude queries with this tag (e.g., expensive)
+  -x, --exclude <tag>  Exclude queries with this tag (e.g., expensive)
   -o, --only <tag>     Run only queries with this tag
+  -e, --env <size>     Memory profile (16gb, 32gb, 64gb) for report metadata
   --report         Generate JSON and Markdown reports in reports/
   -h, --help       Show this help message
 
@@ -81,7 +89,7 @@ Examples:
   pnpm benchmark -q full-count -r 5       # Specific query, 5 runs
   pnpm benchmark --exclude expensive      # Skip expensive queries
   pnpm benchmark --only matching          # Only record matching queries
-  pnpm benchmark --report                 # Generate reports
+  pnpm benchmark --env 16gb --report      # With environment tag
 `);
   process.exit(0);
 }
@@ -222,15 +230,17 @@ async function main(): Promise<void> {
     if (runTrino) cmdParts.push("--trino");
   }
   if (values.query) cmdParts.push(`-q ${values.query}`);
-  if (values.exclude) cmdParts.push(`--exclude ${values.exclude}`);
-  if (values.only) cmdParts.push(`--only ${values.only}`);
+  if (values.exclude) cmdParts.push(`-x ${values.exclude}`);
+  if (values.only) cmdParts.push(`-o ${values.only}`);
   cmdParts.push(`--warmup ${String(WARMUP_RUNS)}`);
   cmdParts.push(`-r ${String(BENCHMARK_RUNS)}`);
+  if (values.env) cmdParts.push(`--env ${values.env}`);
   cmdParts.push("--report");
 
   const report: BenchmarkReport = {
     timestamp: new Date().toISOString(),
     command: cmdParts.join(" "),
+    environment: getEnvironmentInfo(values.env),
     warmupRuns: WARMUP_RUNS,
     benchmarkRuns: BENCHMARK_RUNS,
     databases: [],
@@ -274,12 +284,26 @@ function generateReport(report: BenchmarkReport): void {
 }
 
 function generateMarkdown(report: BenchmarkReport): string {
+  const env = report.environment;
+
   const lines: string[] = [
     "# Benchmark Report",
     "",
     `**Date:** ${report.timestamp}`,
     `**Warmup Runs:** ${String(report.warmupRuns)}`,
     `**Benchmark Runs:** ${String(report.benchmarkRuns)}`,
+    "",
+    "## Environment",
+    "",
+    `| Property | Value |`,
+    `|----------|-------|`,
+    `| Memory Profile | ${env.memoryProfile ?? "not specified"} |`,
+    `| Total Memory | ${String(env.totalMemoryGB)} GB |`,
+    `| Free Memory | ${String(env.freeMemoryGB)} GB |`,
+    `| CPU Cores | ${String(env.cpuCores)} |`,
+    `| CPU Model | ${env.cpuModel} |`,
+    `| Platform | ${env.platform} ${env.osRelease} |`,
+    `| Node.js | ${env.nodeVersion} |`,
     "",
     "**Command to reproduce:**",
     "```bash",

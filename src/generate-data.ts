@@ -1,4 +1,6 @@
 import { parseArgs } from "node:util";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import {
   PostgresDataGenerator,
   ClickHouseDataGenerator,
@@ -6,8 +8,9 @@ import {
   type TableConfig,
   type BaseDataGenerator,
   type Scenario,
+  type ScenarioResult,
 } from "@mkven/samples-generation";
-import { formatDuration } from "./utils.js";
+import { formatDuration, getEnvironmentInfo, type EnvironmentInfo } from "./utils.js";
 import {
   getEnglishMaleNames,
   getEnglishFemaleNames,
@@ -21,6 +24,8 @@ const { values } = parseArgs({
     trino: { type: "boolean", default: false },
     rows: { type: "string", short: "n", default: "100000000" },
     batch: { type: "string", short: "b" },
+    env: { type: "string", short: "e" },
+    report: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -35,6 +40,8 @@ Options:
   --trino          Generate data for Trino/Iceberg
   -n, --rows <n>   Number of rows to generate (default: 100_000_000)
   -b, --batch <n>  Batch size (default: 10_000_000)
+  -e, --env <size> Memory profile (16gb, 32gb, 64gb) for report metadata
+  --report         Generate JSON and Markdown reports in reports/
   -h, --help       Show this help message
 
 If no database is specified, all databases are populated.
@@ -43,8 +50,36 @@ Examples:
   pnpm generate                          # All databases, 100M rows
   pnpm generate --postgres -n 1_000_000  # PostgreSQL only, 1M rows
   pnpm generate -n 10_000_000 -b 100_000 # Custom batch size
+  pnpm generate --postgres --env 16gb --report  # With environment tag
 `);
   process.exit(0);
+}
+
+// Report types
+interface TableResult {
+  table: string;
+  rows: number;
+  durationMs: number;
+  generateMs: number;
+  optimizeMs: number;
+  rowsPerSecond: number;
+}
+
+interface DatabaseGenerationResult {
+  database: string;
+  tables: TableResult[];
+  totalRows: number;
+  totalDurationMs: number;
+  totalRowsPerSecond: number;
+}
+
+interface GenerationReport {
+  timestamp: string;
+  command: string;
+  environment: EnvironmentInfo;
+  rowCount: number;
+  batchSize: number;
+  databases: DatabaseGenerationResult[];
 }
 
 // Parse number with underscore separators (e.g., 1_000_000)
@@ -215,7 +250,7 @@ const DATABASES: DatabaseConfig[] = [
   },
 ];
 
-async function generateForDatabase(config: DatabaseConfig): Promise<void> {
+async function generateForDatabase(config: DatabaseConfig): Promise<DatabaseGenerationResult> {
   console.log(`\n=== ${config.name} ===`);
   const generator = config.createGenerator();
 
@@ -338,9 +373,46 @@ async function generateForDatabase(config: DatabaseConfig): Promise<void> {
     console.log(
       `Generated ${result.totalRowsInserted.toLocaleString()} total rows in ${durationStr}`
     );
+
+    return buildDatabaseResult(config.name, result);
   } finally {
     await generator.disconnect();
   }
+}
+
+function buildDatabaseResult(
+  databaseName: string,
+  result: ScenarioResult
+): DatabaseGenerationResult {
+  const tables: TableResult[] = result.steps
+    .filter(
+      (step): step is typeof step & { generate: NonNullable<typeof step.generate> } =>
+        step.generate !== undefined
+    )
+    .map((step) => {
+      const gen = step.generate;
+      const rowsPerSecond =
+        gen.durationMs > 0 ? Math.round((gen.rowsInserted / gen.durationMs) * 1000) : 0;
+      return {
+        table: step.tableName,
+        rows: gen.rowsInserted,
+        durationMs: gen.durationMs,
+        generateMs: gen.generateMs,
+        optimizeMs: gen.optimizeMs,
+        rowsPerSecond,
+      };
+    });
+
+  const totalRowsPerSecond =
+    result.durationMs > 0 ? Math.round((result.totalRowsInserted / result.durationMs) * 1000) : 0;
+
+  return {
+    database: databaseName,
+    tables,
+    totalRows: result.totalRowsInserted,
+    totalDurationMs: result.durationMs,
+    totalRowsPerSecond,
+  };
 }
 
 async function main(): Promise<void> {
@@ -355,11 +427,114 @@ async function main(): Promise<void> {
           (values.trino && db.name === "Trino/Iceberg")
       );
 
+  // Build command to reproduce
+  const cmdParts = ["pnpm generate"];
+  if (!noDbSelected) {
+    if (values.postgres) cmdParts.push("--postgres");
+    if (values.clickhouse) cmdParts.push("--clickhouse");
+    if (values.trino) cmdParts.push("--trino");
+  }
+  cmdParts.push(`-n ${ROW_COUNT.toLocaleString().replace(/,/g, "_")}`);
+  cmdParts.push(`-b ${BATCH_SIZE.toLocaleString().replace(/,/g, "_")}`);
+  if (values.env) cmdParts.push(`--env ${values.env}`);
+  cmdParts.push("--report");
+
+  const report: GenerationReport = {
+    timestamp: new Date().toISOString(),
+    command: cmdParts.join(" "),
+    environment: getEnvironmentInfo(values.env),
+    rowCount: ROW_COUNT,
+    batchSize: BATCH_SIZE,
+    databases: [],
+  };
+
   for (const db of dbsToRun) {
-    await generateForDatabase(db);
+    const result = await generateForDatabase(db);
+    report.databases.push(result);
+  }
+
+  if (values.report) {
+    generateReport(report);
   }
 
   console.log("\nDone!");
+}
+
+function generateReport(report: GenerationReport): void {
+  const reportsDir = "reports";
+  mkdirSync(reportsDir, { recursive: true });
+
+  const timestamp = report.timestamp.replace(/[:.]/g, "-").slice(0, 19);
+
+  // JSON report
+  const jsonPath = join(reportsDir, `generation-${timestamp}.json`);
+  writeFileSync(jsonPath, JSON.stringify(report, null, 2));
+  console.log(`\nGenerated JSON report: ${jsonPath}`);
+
+  // Markdown report
+  const mdPath = join(reportsDir, `generation-${timestamp}.md`);
+  const md = generateMarkdown(report);
+  writeFileSync(mdPath, md);
+  console.log(`Generated Markdown report: ${mdPath}`);
+}
+
+function generateMarkdown(report: GenerationReport): string {
+  const env = report.environment;
+
+  const lines: string[] = [
+    "# Data Generation Report",
+    "",
+    `**Date:** ${report.timestamp}`,
+    `**Rows per table:** ${report.rowCount.toLocaleString()}`,
+    `**Batch size:** ${report.batchSize.toLocaleString()}`,
+    "",
+    "## Environment",
+    "",
+    `| Property | Value |`,
+    `|----------|-------|`,
+    `| Memory Profile | ${env.memoryProfile ?? "not specified"} |`,
+    `| Total Memory | ${String(env.totalMemoryGB)} GB |`,
+    `| Free Memory | ${String(env.freeMemoryGB)} GB |`,
+    `| CPU Cores | ${String(env.cpuCores)} |`,
+    `| CPU Model | ${env.cpuModel} |`,
+    `| Platform | ${env.platform} ${env.osRelease} |`,
+    `| Node.js | ${env.nodeVersion} |`,
+    "",
+    "**Command to reproduce:**",
+    "```bash",
+    report.command,
+    "```",
+    "",
+    "## Summary",
+    "",
+    "| Database | Total Rows | Duration | Rows/sec |",
+    "|----------|------------|----------|----------|",
+  ];
+
+  for (const db of report.databases) {
+    lines.push(
+      `| ${db.database} | ${db.totalRows.toLocaleString()} | ${formatDuration(db.totalDurationMs)} | ${db.totalRowsPerSecond.toLocaleString()} |`
+    );
+  }
+
+  lines.push("");
+  lines.push("## Per-Table Details");
+  lines.push("");
+
+  for (const db of report.databases) {
+    lines.push(`### ${db.database}`);
+    lines.push("");
+    lines.push("| Table | Rows | Duration | Generate | Optimize | Rows/sec |");
+    lines.push("|-------|------|----------|----------|----------|----------|");
+    for (const t of db.tables) {
+      lines.push(
+        `| ${t.table} | ${t.rows.toLocaleString()} | ${formatDuration(t.durationMs)} | ${formatDuration(t.generateMs)} | ${formatDuration(t.optimizeMs)} | ${t.rowsPerSecond.toLocaleString()} |`
+      );
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 main().catch((err: unknown) => {

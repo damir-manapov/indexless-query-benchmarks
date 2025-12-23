@@ -75,6 +75,27 @@ pnpm install
 pnpm compose:up
 ```
 
+#### Memory-Constrained Environments
+
+For running a single database with specific memory limits (the limit applies to the database container only; ensure your machine has additional RAM for the host OS):
+
+```bash
+# 16GB machine
+pnpm compose:up:postgres:16gb
+pnpm compose:up:clickhouse:16gb
+pnpm compose:up:trino:16gb
+
+# 32GB machine
+pnpm compose:up:postgres:32gb
+pnpm compose:up:clickhouse:32gb
+pnpm compose:up:trino:32gb
+
+# 64GB machine
+pnpm compose:up:postgres:64gb
+pnpm compose:up:clickhouse:64gb
+pnpm compose:up:trino:64gb
+```
+
 ### Generate Test Data
 
 ```bash
@@ -91,7 +112,15 @@ pnpm generate -n 10_000_000 -b 1_000_000
 pnpm generate:postgres -n 10_000_000
 pnpm generate:clickhouse -n 10_000_000
 pnpm generate:trino -n 10_000_000
+
+# Generate with report (JSON + Markdown)
+pnpm generate --postgres --report
+
+# With environment tag for report metadata
+pnpm generate --postgres --env 16gb --report
 ```
+
+Generation reports are saved to `reports/generation-*.{json,md}` with per-table timing and throughput stats.
 
 Default batch sizes: 1M for PostgreSQL, 100M for ClickHouse/Trino.
 
@@ -115,10 +144,13 @@ pnpm benchmark -r 5 --warmup 2
 # Filter by tags
 pnpm benchmark --only matching       # Only matching queries
 pnpm benchmark --only deduplication   # Only deduplication queries
-pnpm benchmark --exclude expensive    # Skip expensive queries
+pnpm benchmark -x expensive           # Skip expensive queries
 
 # Generate reports (JSON + Markdown)
 pnpm benchmark --report
+
+# With environment tag for report metadata
+pnpm benchmark --postgres --env 16gb --report
 ```
 
 Reports are saved to `reports/` directory with timestamped filenames. Each report includes:

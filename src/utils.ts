@@ -1,3 +1,5 @@
+import os from "node:os";
+
 /**
  * Format duration in milliseconds to human-readable string
  */
@@ -39,4 +41,46 @@ export function calculateStats(values: number[]): {
     median: sorted[Math.floor(sorted.length / 2)] ?? 0,
     p95: sorted[Math.floor(sorted.length * 0.95)] ?? 0,
   };
+}
+
+/**
+ * Environment information for reports
+ */
+export interface EnvironmentInfo {
+  /** Memory profile used (16gb, 32gb, 64gb) - optional, user-specified */
+  memoryProfile?: string;
+  /** Total system memory in GB */
+  totalMemoryGB: number;
+  /** Available system memory in GB */
+  freeMemoryGB: number;
+  /** Number of CPU cores */
+  cpuCores: number;
+  /** CPU model */
+  cpuModel: string;
+  /** Operating system platform */
+  platform: string;
+  /** Operating system release */
+  osRelease: string;
+  /** Node.js version */
+  nodeVersion: string;
+}
+
+/**
+ * Detect environment information
+ */
+export function getEnvironmentInfo(memoryProfile?: string): EnvironmentInfo {
+  const cpus = os.cpus();
+  const result: EnvironmentInfo = {
+    totalMemoryGB: Math.round(os.totalmem() / (1024 * 1024 * 1024)),
+    freeMemoryGB: Math.round(os.freemem() / (1024 * 1024 * 1024)),
+    cpuCores: cpus.length,
+    cpuModel: cpus[0]?.model ?? "Unknown",
+    platform: os.platform(),
+    osRelease: os.release(),
+    nodeVersion: process.version,
+  };
+  if (memoryProfile) {
+    result.memoryProfile = memoryProfile;
+  }
+  return result;
 }
