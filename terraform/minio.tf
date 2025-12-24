@@ -1,10 +1,16 @@
-# MinIO Distributed Cluster - 2 nodes x 3 drives = 6 drives (EC:3)
+# MinIO Distributed Cluster - configurable nodes x drives
 
 # Variables for MinIO
 variable "minio_enabled" {
   description = "Enable MinIO cluster deployment"
   type        = bool
   default     = false
+}
+
+variable "minio_node_count" {
+  description = "Number of MinIO nodes"
+  type        = number
+  default     = 2
 }
 
 variable "minio_node_cpu" {
@@ -93,7 +99,7 @@ resource "openstack_networking_secgroup_rule_v2" "minio_console" {
 
 # Boot volumes for MinIO nodes
 resource "openstack_blockstorage_volume_v3" "minio_boot" {
-  count = var.minio_enabled ? 2 : 0
+  count = var.minio_enabled ? var.minio_node_count : 0
 
   name              = "minio-${count.index + 1}-boot"
   size              = 50
@@ -102,9 +108,9 @@ resource "openstack_blockstorage_volume_v3" "minio_boot" {
   availability_zone = var.availability_zone
 }
 
-# Data volumes for MinIO nodes (3 per node = 6 total)
+# Data volumes for MinIO nodes (drives_per_node * node_count total)
 resource "openstack_blockstorage_volume_v3" "minio_data" {
-  count = var.minio_enabled ? 6 : 0
+  count = var.minio_enabled ? var.minio_node_count * var.minio_drives_per_node : 0
 
   name              = "minio-${floor(count.index / var.minio_drives_per_node) + 1}-data-${count.index % var.minio_drives_per_node + 1}"
   size              = var.minio_drive_size_gb
@@ -119,7 +125,7 @@ resource "openstack_blockstorage_volume_v3" "minio_data" {
 
 # Network ports for MinIO nodes
 resource "openstack_networking_port_v2" "minio" {
-  count = var.minio_enabled ? 2 : 0
+  count = var.minio_enabled ? var.minio_node_count : 0
 
   name           = "minio-${count.index + 1}-port"
   network_id     = openstack_networking_network_v2.benchmark.id
@@ -138,8 +144,40 @@ resource "openstack_networking_port_v2" "minio" {
   ]
 }
 
-# Cloud-init for MinIO nodes
+# Cloud-init for MinIO nodes - generates dynamic /etc/hosts and volume spec
 locals {
+  # Generate /etc/hosts entries for all nodes
+  minio_hosts_entries = join("\n", [
+    for i in range(var.minio_node_count) : "      - echo '10.0.0.${10 + i} minio${i + 1}' >> /etc/hosts"
+  ])
+
+  # Generate device letters (sdb, sdc, sdd, ...)
+  drive_letters = [for i in range(var.minio_drives_per_node) : element(["b", "c", "d", "e", "f", "g", "h", "i", "j"], i)]
+
+  # Generate format commands
+  minio_format_cmds = join("\n", [
+    for letter in local.drive_letters : "      - mkfs.xfs -f /dev/sd${letter}"
+  ])
+
+  # Generate mkdir command
+  minio_mkdir_cmd = "      - mkdir -p ${join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])}"
+
+  # Generate mount commands
+  minio_mount_cmds = join("\n", [
+    for i in range(var.minio_drives_per_node) : "      - mount /dev/sd${local.drive_letters[i]} /data${i + 1}"
+  ])
+
+  # Generate fstab entries
+  minio_fstab_cmds = join("\n", [
+    for i in range(var.minio_drives_per_node) : "      - echo '/dev/sd${local.drive_letters[i]} /data${i + 1} xfs defaults,noatime 0 2' >> /etc/fstab"
+  ])
+
+  # Generate chown commands
+  minio_chown_dirs = join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])
+
+  # MinIO volume spec: http://minio{1...N}:9000/data{1...M}
+  minio_volume_spec = "http://minio{1...${var.minio_node_count}}:9000/data{1...${var.minio_drives_per_node}}"
+
   minio_cloud_init = <<-EOF
     #cloud-config
     package_update: true
@@ -150,20 +188,19 @@ locals {
 
     runcmd:
       # Add hostnames for MinIO cluster (required for single erasure set)
-      - echo '10.0.0.10 minio1' >> /etc/hosts
-      - echo '10.0.0.11 minio2' >> /etc/hosts
+${local.minio_hosts_entries}
 
-      # Format and mount data drives
-      - mkfs.xfs -f /dev/sdb
-      - mkfs.xfs -f /dev/sdc
-      - mkfs.xfs -f /dev/sdd
-      - mkdir -p /data1 /data2 /data3
-      - mount /dev/sdb /data1
-      - mount /dev/sdc /data2
-      - mount /dev/sdd /data3
-      - echo '/dev/sdb /data1 xfs defaults,noatime 0 2' >> /etc/fstab
-      - echo '/dev/sdc /data2 xfs defaults,noatime 0 2' >> /etc/fstab
-      - echo '/dev/sdd /data3 xfs defaults,noatime 0 2' >> /etc/fstab
+      # Format data drives
+${local.minio_format_cmds}
+
+      # Create mount points
+${local.minio_mkdir_cmd}
+
+      # Mount drives
+${local.minio_mount_cmds}
+
+      # Add to fstab
+${local.minio_fstab_cmds}
 
       # Install MinIO server and client
       - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
@@ -172,15 +209,14 @@ locals {
 
       # Create minio user
       - useradd -r -s /sbin/nologin minio-user
-      - chown -R minio-user:minio-user /data1 /data2 /data3
+      - chown -R minio-user:minio-user ${local.minio_chown_dirs}
 
       # Create MinIO environment file
-      # Single volume spec with hostnames creates one erasure set across all 6 drives (EC:3)
       - |
         cat > /etc/default/minio << 'ENVFILE'
         MINIO_ROOT_USER="${var.minio_root_user}"
         MINIO_ROOT_PASSWORD="${var.minio_root_password}"
-        MINIO_VOLUMES="http://minio{1...2}:9000/data{1...3}"
+        MINIO_VOLUMES="${local.minio_volume_spec}"
         MINIO_OPTS="--console-address :9001"
         ENVFILE
 
@@ -220,7 +256,7 @@ locals {
 
 # MinIO compute instances
 resource "openstack_compute_instance_v2" "minio" {
-  count = var.minio_enabled ? 2 : 0
+  count = var.minio_enabled ? var.minio_node_count : 0
 
   name              = "minio-${count.index + 1}"
   flavor_id         = openstack_compute_flavor_v2.minio[0].id
@@ -232,6 +268,7 @@ resource "openstack_compute_instance_v2" "minio" {
     port = openstack_networking_port_v2.minio[count.index].id
   }
 
+  # Boot volume
   block_device {
     uuid                  = openstack_blockstorage_volume_v3.minio_boot[count.index].id
     source_type           = "volume"
@@ -240,28 +277,16 @@ resource "openstack_compute_instance_v2" "minio" {
     delete_on_termination = true
   }
 
-  block_device {
-    uuid                  = openstack_blockstorage_volume_v3.minio_data[count.index * 3].id
-    source_type           = "volume"
-    destination_type      = "volume"
-    boot_index            = 1
-    delete_on_termination = false
-  }
-
-  block_device {
-    uuid                  = openstack_blockstorage_volume_v3.minio_data[count.index * 3 + 1].id
-    source_type           = "volume"
-    destination_type      = "volume"
-    boot_index            = 2
-    delete_on_termination = false
-  }
-
-  block_device {
-    uuid                  = openstack_blockstorage_volume_v3.minio_data[count.index * 3 + 2].id
-    source_type           = "volume"
-    destination_type      = "volume"
-    boot_index            = 3
-    delete_on_termination = false
+  # Data volumes (dynamic based on drives_per_node)
+  dynamic "block_device" {
+    for_each = range(var.minio_drives_per_node)
+    content {
+      uuid                  = openstack_blockstorage_volume_v3.minio_data[count.index * var.minio_drives_per_node + block_device.value].id
+      source_type           = "volume"
+      destination_type      = "volume"
+      boot_index            = block_device.value + 1
+      delete_on_termination = false
+    }
   }
 
   lifecycle {
@@ -281,7 +306,7 @@ resource "openstack_compute_instance_v2" "minio" {
 # Outputs
 output "minio_internal_endpoints" {
   description = "MinIO internal endpoints for Trino"
-  value       = var.minio_enabled ? ["http://10.0.0.10:9000", "http://10.0.0.11:9000"] : null
+  value       = var.minio_enabled ? [for i in range(var.minio_node_count) : "http://10.0.0.${10 + i}:9000"] : null
 }
 
 output "minio_credentials" {

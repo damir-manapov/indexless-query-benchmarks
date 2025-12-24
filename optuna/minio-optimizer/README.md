@@ -37,14 +37,14 @@ uv run python optimizer.py --trials 20 --benchmark-vm-ip 81.177.222.139
 
 | Parameter | Values | Notes |
 |-----------|--------|-------|
-| nodes | 2 (fixed) | Limited by floating IP quota |
+| nodes | 2, 3, 4, 6 | Number of MinIO nodes |
 | cpu_per_node | 2, 4, 8, 12 | vCPU per MinIO node |
 | ram_per_node | 8, 16, 32, 64 | GB per node |
-| drives_per_node | 3 (fixed) | Hardcoded in terraform |
+| drives_per_node | 2, 3, 4 | Drives per node |
 | drive_size_gb | 100, 200, 400 | Size per drive |
 | drive_type | fast, universal | SSD tier |
 
-Total: ~32 possible configurations (4×4×3×2)
+Total: ~1152 possible configurations (4×4×4×3×3×2)
 
 ## Output
 

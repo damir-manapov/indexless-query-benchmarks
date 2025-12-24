@@ -29,10 +29,10 @@ from optuna.samplers import TPESampler
 
 # Configuration space
 CONFIG_SPACE = {
-    "nodes": [2],  # Fixed at 2 due to IP quota
+    "nodes": [2, 3, 4, 6],  # Variable node count
     "cpu_per_node": [2, 4, 8, 12],
     "ram_per_node": [8, 16, 32, 64],
-    "drives_per_node": [3],  # Fixed at 3 (hardcoded in terraform block_device)
+    "drives_per_node": [2, 3, 4],  # Variable drives per node
     "drive_size_gb": [100, 200, 400],
     "drive_type": ["fast", "universal"],
 }
@@ -74,6 +74,7 @@ def update_tfvars(config: dict) -> None:
     
     # Update MinIO-specific variables
     replacements = {
+        r"minio_node_count\s*=\s*\d+": f"minio_node_count    = {config['nodes']}",
         r"minio_node_cpu\s*=\s*\d+": f"minio_node_cpu      = {config['cpu_per_node']}",
         r"minio_node_ram_gb\s*=\s*\d+": f"minio_node_ram_gb   = {config['ram_per_node']}",
         r"minio_drives_per_node\s*=\s*\d+": f"minio_drives_per_node = {config['drives_per_node']}",
@@ -99,16 +100,21 @@ def deploy_minio(config: dict) -> bool:
     update_tfvars(config)
     
     # Taint MinIO resources to force recreation
-    taint_resources = [
-        "openstack_compute_instance_v2.minio[0]",
-        "openstack_compute_instance_v2.minio[1]",
-        "openstack_blockstorage_volume_v3.minio_boot[0]",
-        "openstack_blockstorage_volume_v3.minio_boot[1]",
-    ]
+    taint_resources = []
     
-    # Add data volume taints based on drive count
-    for i in range(config["drives_per_node"] * 2):
+    # Taint all node instances and boot volumes
+    for i in range(config["nodes"]):
+        taint_resources.append(f"openstack_compute_instance_v2.minio[{i}]")
+        taint_resources.append(f"openstack_blockstorage_volume_v3.minio_boot[{i}]")
+    
+    # Add data volume taints based on total drive count
+    total_drives = config["nodes"] * config["drives_per_node"]
+    for i in range(total_drives):
         taint_resources.append(f"openstack_blockstorage_volume_v3.minio_data[{i}]")
+    
+    # Also taint network ports
+    for i in range(config["nodes"]):
+        taint_resources.append(f"openstack_networking_port_v2.minio[{i}]")
     
     for resource in taint_resources:
         run_command(["terraform", "taint", resource], cwd=TERRAFORM_DIR)
@@ -245,10 +251,10 @@ def calculate_cost(config: dict) -> float:
 def objective(trial: optuna.Trial, vm_ip: str) -> float:
     """Optuna objective function."""
     config = {
-        "nodes": 2,  # Fixed
+        "nodes": trial.suggest_categorical("nodes", CONFIG_SPACE["nodes"]),
         "cpu_per_node": trial.suggest_categorical("cpu_per_node", CONFIG_SPACE["cpu_per_node"]),
         "ram_per_node": trial.suggest_categorical("ram_per_node", CONFIG_SPACE["ram_per_node"]),
-        "drives_per_node": 3,  # Fixed (hardcoded in terraform)
+        "drives_per_node": trial.suggest_categorical("drives_per_node", CONFIG_SPACE["drives_per_node"]),
         "drive_size_gb": trial.suggest_categorical("drive_size_gb", CONFIG_SPACE["drive_size_gb"]),
         "drive_type": trial.suggest_categorical("drive_type", CONFIG_SPACE["drive_type"]),
     }
