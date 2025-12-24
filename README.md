@@ -105,6 +105,8 @@ pnpm install
 
 For running benchmarks on cloud VMs with production MinIO cluster, see [terraform/README.md](terraform/README.md).
 
+For automated MinIO configuration optimization using Bayesian search, see [optuna/minio-optimizer/README.md](optuna/minio-optimizer/README.md).
+
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
@@ -156,6 +158,20 @@ pnpm compose:up:trino:minio-cluster
 # Start Trino 64GB with MinIO cluster
 pnpm compose:up:trino:64gb:minio-cluster
 ```
+
+#### Standalone MinIO (Terraform-deployed)
+
+When using MinIO deployed via Terraform (see [terraform/README.md](terraform/README.md)), connect Trino to the external cluster:
+
+```bash
+# Start Trino with Terraform-deployed MinIO
+pnpm compose:up:trino:standalone-minio
+
+# Or with 64GB memory config
+pnpm compose:up:trino:64gb:standalone-minio
+```
+
+This uses hardcoded endpoint `10.0.0.10:9000` configured for the Terraform MinIO cluster on the private network.
 
 #### Remote S3 Storage
 

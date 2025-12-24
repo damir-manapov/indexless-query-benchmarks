@@ -1,16 +1,8 @@
 # Trino with standalone MinIO (deployed via Terraform)
-# Usage: docker compose -f docker-compose.yml -f docker-compose.standalone-minio.yml up -d trino
+# Usage: docker compose -f docker-compose.yml -f docker-compose.standalone-minio.yml up -d
 #
-# Required environment variables:
-#   MINIO_HOST    - MinIO server IP (default: 10.0.0.10)
-#   S3_ACCESS_KEY - MinIO access key (default: minioadmin)
-#   S3_SECRET_KEY - MinIO secret key
-#
-# Example:
-#   export MINIO_HOST=10.0.0.10
-#   export S3_ACCESS_KEY=minioadmin
-#   export S3_SECRET_KEY=minioadmin123
-#   pnpm compose:up:trino:standalone-minio
+# MinIO endpoint: 10.0.0.10:9000 (hardcoded for Terraform-deployed cluster)
+# Credentials: minioadmin / minioadmin123
 
 services:
   # Disable local MinIO - using standalone MinIO
@@ -20,22 +12,29 @@ services:
     deploy:
       replicas: 0
 
-  # Skip bucket creation - will be created by Trino/Iceberg
+  # Create buckets on standalone MinIO
   create-minio-bucket:
-    image: busybox:1.37
-    command: ["true"]
-    deploy:
-      replicas: 0
+    image: minio/mc:latest
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set myminio http://10.0.0.10:9000 minioadmin minioadmin123;
+      mc mb --ignore-existing myminio/warehouse;
+      mc mb --ignore-existing myminio/exchange;
+      exit 0;
+      "
 
   trino:
     environment:
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-minioadmin}
-      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin123
     volumes:
       # Override catalog config to use standalone MinIO
       - ./trino/catalog/iceberg.standalone-minio.properties:/etc/trino/catalog/iceberg.properties:ro
       # Override exchange manager to use standalone MinIO
       - ./trino/exchange-manager.standalone-minio.properties:/etc/trino/exchange-manager.properties:ro
     depends_on:
+      create-minio-bucket:
+        condition: service_completed_successfully
       nessie:
         condition: service_healthy
