@@ -1,0 +1,9 @@
+[project]
+name = "minio-optimizer"
+version = "0.1.0"
+description = "Bayesian optimization for MinIO cluster configuration"
+requires-python = ">=3.11"
+dependencies = [
+    "optuna>=3.5.0",
+    "python-terraform>=0.10.1",
+]

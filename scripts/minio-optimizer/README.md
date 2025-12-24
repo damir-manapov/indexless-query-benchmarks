@@ -15,9 +15,7 @@ Bayesian optimization for finding the best MinIO cluster configuration using Opt
 
 ```bash
 cd scripts/minio-optimizer
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
 
 ## Usage
@@ -29,11 +27,10 @@ terraform init
 
 # Run optimization (10 trials)
 cd ../scripts/minio-optimizer
-source venv/bin/activate
-python optimizer.py --trials 10 --benchmark-vm-ip 81.177.222.139
+uv run python optimizer.py --trials 10 --benchmark-vm-ip 81.177.222.139
 
 # More trials for better exploration
-python optimizer.py --trials 20 --benchmark-vm-ip 81.177.222.139
+uv run python optimizer.py --trials 20 --benchmark-vm-ip 81.177.222.139
 ```
 
 ## Configuration Space
