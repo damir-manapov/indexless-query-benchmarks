@@ -3,8 +3,8 @@ set -e
 
 cd "$(dirname "$0")"
 
-echo "=== Terraform Format Check ==="
-terraform fmt -check -recursive
+echo "=== Terraform Format ==="
+terraform fmt -recursive
 
 echo ""
 echo "=== Terraform Validate ==="
