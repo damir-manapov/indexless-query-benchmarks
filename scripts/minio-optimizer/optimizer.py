@@ -134,12 +134,14 @@ def run_warp_benchmark(vm_ip: str, minio_ip: str = "10.0.0.10") -> BenchmarkResu
     """Run warp benchmark and parse results."""
     print("  Running warp benchmark...")
     
-    warp_cmd = f"""warp mixed \
-        --host={minio_ip}:9000 \
-        --access-key=minioadmin \
-        --secret-key=minioadmin123 \
-        --autoterm \
-        --json"""
+    # Note: --json doesn't work well with mixed, use text output
+    warp_cmd = (
+        f"warp mixed "
+        f"--host={minio_ip}:9000 "
+        f"--access-key=minioadmin "
+        f"--secret-key=minioadmin123 "
+        f"--autoterm 2>&1"
+    )
     
     ssh_cmd = ["ssh", f"root@{vm_ip}", warp_cmd]
     
@@ -147,11 +149,14 @@ def run_warp_benchmark(vm_ip: str, minio_ip: str = "10.0.0.10") -> BenchmarkResu
     code, stdout, stderr = run_command(ssh_cmd)
     duration = time.time() - start_time
     
+    # Combine stdout and stderr since warp may output to either
+    output = stdout + stderr
+    
     if code != 0:
-        print(f"  Warp failed: {stderr}")
+        print(f"  Warp failed: {output[:500]}")
         return None
     
-    return parse_warp_output(stdout, duration)
+    return parse_warp_output(output, duration)
 
 
 def parse_warp_output(output: str, duration: float) -> BenchmarkResult | None:
@@ -166,18 +171,25 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult | None:
         "total_obj_s": 0.0,
     }
     
-    # Patterns for parsing warp output
+    # Normalize output - remove extra whitespace from SSH line wrapping
+    output = " ".join(output.split())
+    
+    # Patterns for parsing warp output (more flexible)
     patterns = {
-        "get": r"Report: GET.*?Average: ([\d.]+) MiB/s, ([\d.]+) obj/s",
-        "put": r"Report: PUT.*?Average: ([\d.]+) MiB/s, ([\d.]+) obj/s",
-        "total": r"Report: Total.*?Average: ([\d.]+) MiB/s, ([\d.]+) obj/s",
+        "get": r"Report:\s*GET.*?Average:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s",
+        "put": r"Report:\s*PUT.*?Average:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s",
+        "total": r"Report:\s*Total.*?Average:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s",
     }
     
     for key, pattern in patterns.items():
-        match = re.search(pattern, output, re.DOTALL)
+        match = re.search(pattern, output, re.DOTALL | re.IGNORECASE)
         if match:
             result[f"{key}_mib_s"] = float(match.group(1))
             result[f"{key}_obj_s"] = float(match.group(2))
+    
+    # Debug output
+    if result["total_mib_s"] == 0:
+        print(f"  Warning: Could not parse warp output. Sample: {output[:200]}...")
     
     return BenchmarkResult(
         config={},

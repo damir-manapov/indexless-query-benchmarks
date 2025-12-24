@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Results (generated)
+results.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
