@@ -44,6 +44,8 @@
     "compose:up:trino:64gb:minio-cluster": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.64gb.yml -f compose/docker-compose.minio-cluster.yml up -d trino",
     "compose:up:trino:remote-s3": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.remote-s3.yml up -d trino",
     "compose:up:trino:64gb:remote-s3": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.64gb.yml -f compose/docker-compose.remote-s3.yml up -d trino",
+    "compose:up:trino:standalone-minio": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.standalone-minio.yml up -d trino",
+    "compose:up:trino:64gb:standalone-minio": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.64gb.yml -f compose/docker-compose.standalone-minio.yml up -d trino",
     "compose:down": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.minio-cluster.yml down",
     "compose:restart": "pnpm compose:down && pnpm compose:up",
     "compose:reset": "docker compose -f compose/docker-compose.yml -f compose/docker-compose.minio-cluster.yml down -v --remove-orphans"
