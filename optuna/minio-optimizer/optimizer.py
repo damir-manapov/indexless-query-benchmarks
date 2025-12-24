@@ -303,6 +303,8 @@ def save_result(result: BenchmarkResult, config: dict, trial_number: int) -> Non
 
     ec_level = calculate_ec_level(config["nodes"], config["drives_per_node"])
     total_drives = config["nodes"] * config["drives_per_node"]
+    cost = calculate_cost(config)
+    cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
 
     results.append(
         {
@@ -311,6 +313,8 @@ def save_result(result: BenchmarkResult, config: dict, trial_number: int) -> Non
             "config": config,
             "total_drives": total_drives,
             "ec_level": ec_level,
+            "cost_per_hour": cost,
+            "cost_efficiency": cost_efficiency,
             "get_mib_s": result.get_mib_s,
             "put_mib_s": result.put_mib_s,
             "total_mib_s": result.total_mib_s,
