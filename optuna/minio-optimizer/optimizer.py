@@ -134,6 +134,11 @@ class BenchmarkResult:
     put_obj_s: float
     total_obj_s: float
     duration_s: float
+    # Data generation metrics (Trino/Iceberg ingestion)
+    gen_rows: int = 0
+    gen_duration_s: float = 0.0
+    gen_rows_per_sec: float = 0.0
+    gen_batch_durations: list[float] | None = None
     error: str | None = None
 
 
@@ -298,6 +303,96 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult | None:
     )
 
 
+def run_generation_benchmark(
+    vm_ip: str,
+    rows: int = 100_000_000,
+    batch_size: int = 100_000_000,
+) -> dict | None:
+    """Run Trino data generation benchmark on the VM.
+
+    Returns dict with gen_rows, gen_duration_s, gen_rows_per_sec, gen_batch_durations
+    or None on failure.
+    """
+    print(f"  Running data generation benchmark ({rows:,} rows)...")
+
+    # Run generation with JSON report output
+    gen_cmd = (
+        f"cd /root/indexless-query-benchmarks && "
+        f"pnpm generate --trino -n {rows} -b {batch_size} --report 2>&1"
+    )
+
+    ssh_cmd = ["ssh", f"root@{vm_ip}", gen_cmd]
+
+    start_time = time.time()
+    code, stdout, stderr = run_command(ssh_cmd)
+    total_duration = time.time() - start_time
+
+    output = stdout + stderr
+
+    if code != 0:
+        print(f"  Generation failed: {output[:500]}")
+        return None
+
+    # Parse the JSON report output
+    # Look for the generation report JSON file path
+    json_match = re.search(r"Generated JSON report: ([\w/\-\.]+)", output)
+    if json_match:
+        json_path = json_match.group(1)
+        # Read the JSON report from remote
+        cat_cmd = ["ssh", f"root@{vm_ip}", f"cat {json_path}"]
+        code, json_output, _ = run_command(cat_cmd)
+        if code == 0:
+            try:
+                report = json.loads(json_output)
+                db_result = next(
+                    (
+                        d
+                        for d in report.get("databases", [])
+                        if "Trino" in d["database"]
+                    ),
+                    None,
+                )
+                if db_result:
+                    table = next(
+                        (
+                            t
+                            for t in db_result.get("tables", [])
+                            if t["table"] == "samples"
+                        ),
+                        None,
+                    )
+                    if table:
+                        return {
+                            "gen_rows": table["rows"],
+                            "gen_duration_s": table["durationMs"] / 1000.0,
+                            "gen_rows_per_sec": table["rowsPerSecond"],
+                            "gen_batch_durations": [
+                                d / 1000.0 for d in table.get("batchDurations", [])
+                            ],
+                        }
+            except json.JSONDecodeError:
+                print("  Warning: Could not parse generation report JSON")
+
+    # Fallback: parse console output for rows/sec
+    rows_match = re.search(r"Generated\s+([\d,]+)\s+total\s+rows", output)
+    rate_match = re.search(r"([\d,]+)\s+rows/s", output.lower())
+
+    if rows_match:
+        gen_rows = int(rows_match.group(1).replace(",", ""))
+        gen_rows_per_sec = (
+            int(rate_match.group(1).replace(",", "")) if rate_match else 0
+        )
+        return {
+            "gen_rows": gen_rows,
+            "gen_duration_s": total_duration,
+            "gen_rows_per_sec": gen_rows_per_sec,
+            "gen_batch_durations": None,
+        }
+
+    print("  Warning: Could not parse generation output")
+    return None
+
+
 def save_result(result: BenchmarkResult, config: dict, trial_number: int) -> None:
     """Save benchmark result to JSON file."""
     results = []
@@ -326,6 +421,10 @@ def save_result(result: BenchmarkResult, config: dict, trial_number: int) -> Non
             "put_obj_s": result.put_obj_s,
             "total_obj_s": result.total_obj_s,
             "duration_s": result.duration_s,
+            "gen_rows": result.gen_rows,
+            "gen_duration_s": result.gen_duration_s,
+            "gen_rows_per_sec": result.gen_rows_per_sec,
+            "gen_batch_durations": result.gen_batch_durations,
             "error": result.error,
         }
     )
@@ -353,7 +452,12 @@ def calculate_cost(config: dict) -> float:
     return nodes * (cpu_cost + ram_cost + storage_cost)
 
 
-def objective(trial: optuna.Trial, vm_ip: str) -> float:
+def objective(
+    trial: optuna.Trial,
+    vm_ip: str,
+    gen_rows: int = 100_000_000,
+    gen_batch: int = 100_000_000,
+) -> float:
     """Optuna objective function."""
     config = {
         "nodes": trial.suggest_categorical("nodes", CONFIG_SPACE["nodes"]),
@@ -386,12 +490,26 @@ def objective(trial: optuna.Trial, vm_ip: str) -> float:
     if not deploy_minio(config):
         return 0.0  # Failed deployment
 
-    # Benchmark
+    # Warp benchmark (raw S3 throughput)
     result = run_warp_benchmark(vm_ip)
     if result is None:
         return 0.0  # Failed benchmark
 
     result.config = config
+
+    # Data generation benchmark (Trino/Iceberg ingestion)
+    if gen_rows > 0:
+        gen_result = run_generation_benchmark(
+            vm_ip, rows=gen_rows, batch_size=gen_batch
+        )
+        if gen_result:
+            result.gen_rows = gen_result["gen_rows"]
+            result.gen_duration_s = gen_result["gen_duration_s"]
+            result.gen_rows_per_sec = gen_result["gen_rows_per_sec"]
+            result.gen_batch_durations = gen_result["gen_batch_durations"]
+    else:
+        gen_result = None
+
     save_result(result, config, trial.number)
 
     # Objective: maximize throughput per cost
@@ -401,6 +519,8 @@ def objective(trial: optuna.Trial, vm_ip: str) -> float:
     print(
         f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}, Score: {score:.2f}"
     )
+    if gen_result:
+        print(f"  Generation: {result.gen_rows_per_sec:,.0f} rows/sec")
 
     return result.total_mib_s  # Or use score for cost-efficiency
 
@@ -417,6 +537,18 @@ def main():
         action="store_true",
         help="Disable result caching (re-run all configs)",
     )
+    parser.add_argument(
+        "--gen-rows",
+        type=int,
+        default=100_000_000,
+        help="Rows for generation benchmark (default: 100M, 0 to skip)",
+    )
+    parser.add_argument(
+        "--gen-batch",
+        type=int,
+        default=100_000_000,
+        help="Batch size for generation benchmark (default: 100M)",
+    )
     args = parser.parse_args()
 
     print(f"Starting MinIO optimization with {args.trials} trials")
@@ -424,6 +556,10 @@ def main():
     print(f"Terraform dir: {TERRAFORM_DIR}")
     print(f"Results file: {RESULTS_FILE}")
     print(f"Study database: {STUDY_DB}")
+    if args.gen_rows > 0:
+        print(f"Generation benchmark: {args.gen_rows:,} rows, {args.gen_batch:,} batch")
+    else:
+        print("Generation benchmark: disabled")
     print()
 
     # Create study with SQLite persistence
@@ -449,7 +585,9 @@ def main():
     print()
 
     study.optimize(
-        lambda trial: objective(trial, args.benchmark_vm_ip),
+        lambda trial: objective(
+            trial, args.benchmark_vm_ip, args.gen_rows, args.gen_batch
+        ),
         n_trials=args.trials,
         show_progress_bar=True,
     )

@@ -63,6 +63,8 @@ interface TableResult {
   generateMs: number;
   optimizeMs: number;
   rowsPerSecond: number;
+  batchCount: number;
+  batchDurations: number[];
 }
 
 interface DatabaseGenerationResult {
@@ -400,6 +402,8 @@ function buildDatabaseResult(
         generateMs: gen.generateMs,
         optimizeMs: gen.optimizeMs,
         rowsPerSecond,
+        batchCount: gen.batchCount,
+        batchDurations: gen.batchDurations,
       };
     });
 
@@ -524,14 +528,33 @@ function generateMarkdown(report: GenerationReport): string {
   for (const db of report.databases) {
     lines.push(`### ${db.database}`);
     lines.push("");
-    lines.push("| Table | Rows | Duration | Generate | Optimize | Rows/sec |");
-    lines.push("|-------|------|----------|----------|----------|----------|");
+    lines.push("| Table | Rows | Duration | Generate | Optimize | Rows/sec | Batches |");
+    lines.push("|-------|------|----------|----------|----------|----------|---------|");
     for (const t of db.tables) {
       lines.push(
-        `| ${t.table} | ${t.rows.toLocaleString()} | ${formatDuration(t.durationMs)} | ${formatDuration(t.generateMs)} | ${formatDuration(t.optimizeMs)} | ${t.rowsPerSecond.toLocaleString()} |`
+        `| ${t.table} | ${t.rows.toLocaleString()} | ${formatDuration(t.durationMs)} | ${formatDuration(t.generateMs)} | ${formatDuration(t.optimizeMs)} | ${t.rowsPerSecond.toLocaleString()} | ${String(t.batchCount)} |`
       );
     }
     lines.push("");
+
+    // Add per-batch details if there are multiple batches
+    for (const t of db.tables) {
+      if (t.batchCount > 1) {
+        lines.push(`#### ${t.table} - Batch Details`);
+        lines.push("");
+        lines.push("| Batch | Duration | Rows/sec |");
+        lines.push("|-------|----------|----------|");
+        const rowsPerBatch = Math.ceil(t.rows / t.batchCount);
+        for (let i = 0; i < t.batchDurations.length; i++) {
+          const batchMs = t.batchDurations[i] ?? 0;
+          const batchRowsPerSec = batchMs > 0 ? Math.round((rowsPerBatch / batchMs) * 1000) : 0;
+          lines.push(
+            `| ${String(i + 1)} | ${formatDuration(batchMs)} | ${batchRowsPerSec.toLocaleString()} |`
+          );
+        }
+        lines.push("");
+      }
+    }
   }
 
   return lines.join("\n");

@@ -51,7 +51,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.8.1",
     "@mkven/name-dictionaries": "^0.1.0",
-    "@mkven/samples-generation": "^0.4.2",
+    "@mkven/samples-generation": "^0.4.3",
     "postgres": "^3.4.5",
     "trino-client": "^0.2.9"
   },
