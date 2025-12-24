@@ -8,6 +8,7 @@ __pycache__/
 
 # Results (generated)
 results.json
+study.db
 
 # IDE
 .idea/

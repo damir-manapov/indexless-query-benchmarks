@@ -21,9 +21,11 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import optuna
 from optuna.samplers import TPESampler
+from optuna.trial import TrialState
 
 # Configuration space
 CONFIG_SPACE = {
@@ -50,6 +52,76 @@ def calculate_ec_level(nodes: int, drives_per_node: int) -> int:
 
 TERRAFORM_DIR = Path(__file__).parent.parent.parent / "terraform"
 RESULTS_FILE = Path(__file__).parent / "results.json"
+STUDY_DB = Path(__file__).parent / "study.db"
+
+
+def load_results() -> list[dict[str, Any]]:
+    """Load all results from results.json."""
+    if RESULTS_FILE.exists():
+        with open(RESULTS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def config_to_key(config: dict) -> str:
+    """Convert config dict to a hashable key for deduplication."""
+    return json.dumps(
+        {
+            "nodes": config["nodes"],
+            "cpu_per_node": config["cpu_per_node"],
+            "ram_per_node": config["ram_per_node"],
+            "drives_per_node": config["drives_per_node"],
+            "drive_size_gb": config["drive_size_gb"],
+            "drive_type": config["drive_type"],
+        },
+        sort_keys=True,
+    )
+
+
+def find_cached_result(config: dict) -> dict | None:
+    """Find a cached result for the given config."""
+    target_key = config_to_key(config)
+    for result in load_results():
+        if config_to_key(result["config"]) == target_key:
+            return result
+    return None
+
+
+def seed_study_from_results(study: optuna.Study) -> int:
+    """Seed Optuna study with historical results from results.json."""
+    results = load_results()
+    if not results:
+        return 0
+
+    # Get existing trial configs to avoid duplicates
+    existing_keys = set()
+    for trial in study.trials:
+        if trial.state == TrialState.COMPLETE:
+            existing_keys.add(config_to_key(trial.params))
+
+    seeded = 0
+    for result in results:
+        config = result["config"]
+        key = config_to_key(config)
+
+        if key in existing_keys:
+            continue  # Already in study
+
+        # Add historical trial
+        try:
+            study.add_trial(
+                optuna.trial.create_trial(
+                    params=config,
+                    values=[result["total_mib_s"]],
+                    state=TrialState.COMPLETE,
+                )
+            )
+            existing_keys.add(key)
+            seeded += 1
+        except Exception as e:
+            print(f"  Warning: Could not seed trial: {e}")
+
+    return seeded
 
 
 @dataclass
@@ -296,6 +368,12 @@ def objective(trial: optuna.Trial, vm_ip: str) -> float:
 
     print(f"\nTrial {trial.number}: {config}")
 
+    # Check cache first - avoid re-running same config
+    cached = find_cached_result(config)
+    if cached:
+        print(f"  Using cached result: {cached['total_mib_s']:.1f} MiB/s")
+        return cached["total_mib_s"]
+
     # Deploy
     if not deploy_minio(config):
         return 0.0  # Failed deployment
@@ -326,20 +404,41 @@ def main():
     parser.add_argument(
         "--study-name", default="minio-optimization", help="Optuna study name"
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable result caching (re-run all configs)",
+    )
     args = parser.parse_args()
 
     print(f"Starting MinIO optimization with {args.trials} trials")
     print(f"Benchmark VM: {args.benchmark_vm_ip}")
     print(f"Terraform dir: {TERRAFORM_DIR}")
     print(f"Results file: {RESULTS_FILE}")
+    print(f"Study database: {STUDY_DB}")
     print()
 
-    # Create study with TPE sampler (good for hyperparameter optimization)
+    # Create study with SQLite persistence
+    storage = f"sqlite:///{STUDY_DB}"
     study = optuna.create_study(
         study_name=args.study_name,
+        storage=storage,
         direction="maximize",
         sampler=TPESampler(seed=42),
+        load_if_exists=True,  # Resume existing study
     )
+
+    # Seed study from historical results
+    seeded = seed_study_from_results(study)
+    if seeded > 0:
+        print(f"Seeded {seeded} historical trials from results.json")
+
+    existing_trials = len(study.trials)
+    if existing_trials > 0:
+        print(f"Resuming study with {existing_trials} existing trials")
+        if study.best_trial:
+            print(f"Current best: {study.best_trial.value:.1f} MiB/s")
+    print()
 
     study.optimize(
         lambda trial: objective(trial, args.benchmark_vm_ip),
