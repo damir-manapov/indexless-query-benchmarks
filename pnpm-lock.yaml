@@ -15,8 +15,8 @@ importers:
         specifier: ^0.1.0
         version: 0.1.0
       '@mkven/samples-generation':
-        specifier: ^0.4.3
-        version: 0.4.3
+        specifier: ^0.4.4
+        version: 0.4.4
       postgres:
         specifier: ^3.4.5
         version: 3.4.7
@@ -278,8 +278,8 @@ packages:
     resolution: {integrity: sha512-l2AjFQpRNcOoog7rpuUcbBGP9Crtt6Kvnl+Bhforf8SehyctENoqM0pewNW91TJ6MAynN9kvUigEqEn2oxhfRg==}
     engines: {node: '>=18'}
 
-  '@mkven/samples-generation@0.4.3':
-    resolution: {integrity: sha512-DWd5sds2WZYUwIvL1/6pT+IpBf1/FDjYFvMua7+Ox4dpLaQjtujyFpz57iW+1BHzJHFvtXvUqP2P8/QKEFkdZA==}
+  '@mkven/samples-generation@0.4.4':
+    resolution: {integrity: sha512-FWndWoeLqZEXI3sqJ5/nO7HgkmP1FtIUpDJ99iLsVSRKpMFlDQM4E5EtvKPSxWVyCpBGRSsIjVOM5XcVtJraWA==}
 
   '@rollup/rollup-android-arm-eabi@4.54.0':
     resolution: {integrity: sha512-OywsdRHrFvCdvsewAInDKCNyR3laPA2mc9bRYJ6LBp5IyvF3fvXbbNR0bSzHlZVFtn6E0xw2oZlyjg4rKCVcng==}
@@ -1378,7 +1378,7 @@ snapshots:
 
   '@mkven/name-dictionaries@0.1.0': {}
 
-  '@mkven/samples-generation@0.4.3':
+  '@mkven/samples-generation@0.4.4':
     dependencies:
       '@clickhouse/client': 1.15.0
       '@mkven/name-dictionaries': 0.1.0
