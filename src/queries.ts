@@ -117,7 +117,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dedupe",
     description: "Select distinct rows by multiple columns",
-    tags: ["basic"],
+    tags: ["basic", "expensive"],
     sql: {
       postgres: "SELECT DISTINCT first_name, last_name FROM samples",
       clickhouse: "SELECT DISTINCT first_name, last_name FROM samples",
@@ -193,7 +193,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-exact-name",
     description: "Find exact duplicate names (GROUP BY HAVING)",
-    tags: ["deduplication"],
+    tags: ["deduplication", "expensive"],
     sql: {
       postgres:
         "SELECT first_name, last_name, COUNT(*) as cnt FROM samples GROUP BY first_name, last_name HAVING COUNT(*) > 1",
@@ -219,7 +219,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "dup-window-rank",
     description: "Rank duplicates within groups (window function)",
-    tags: ["deduplication"],
+    tags: ["deduplication", "expensive"],
     sql: {
       postgres:
         "SELECT id, first_name, last_name, ROW_NUMBER() OVER (PARTITION BY first_name, last_name ORDER BY id) as rn FROM samples",
@@ -255,7 +255,7 @@ export const QUERIES: QueryDefinition[] = [
   {
     name: "match-self-join",
     description: "Self-join to find duplicate pairs",
-    tags: ["matching"],
+    tags: ["matching", "expensive"],
     sql: {
       postgres:
         "SELECT COUNT(*) FROM samples a JOIN samples b ON a.first_name = b.first_name AND a.last_name = b.last_name AND a.id < b.id",

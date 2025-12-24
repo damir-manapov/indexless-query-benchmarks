@@ -231,6 +231,10 @@ def run_warp_benchmark(
         f"--host={minio_ip}:9000 "
         f"--access-key=minioadmin "
         f"--secret-key=minioadmin123 "
+        f"--get-distrib 60 "
+        f"--stat-distrib 25 "
+        f"--put-distrib 10 "
+        f"--delete-distrib 5 "
         f"--autoterm 2>&1"
     )
 
