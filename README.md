@@ -91,7 +91,7 @@ Cloud selectel S3:
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - pnpm
 - Docker
 
@@ -99,6 +99,18 @@ Cloud selectel S3:
 
 ```bash
 pnpm install
+```
+
+## Cloud Deployment
+
+For running benchmarks on cloud VMs with production MinIO cluster, see [terraform/README.md](terraform/README.md).
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your Selectel credentials
+terraform init
+terraform apply
 ```
 
 ## Usage

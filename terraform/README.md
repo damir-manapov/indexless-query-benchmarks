@@ -5,8 +5,9 @@ Provision Selectel VMs for running benchmarks with different hardware configurat
 ## Prerequisites
 
 1. [Terraform](https://terraform.io/downloads) >= 1.0
-2. Selectel account with API access
-3. SSH key uploaded to Selectel
+2. [tflint](https://github.com/terraform-linters/tflint) (optional, for linting)
+3. [trivy](https://github.com/aquasecurity/trivy) (optional, for security scanning)
+4. Selectel account with API access
 
 ## Setup
 
@@ -20,7 +21,8 @@ Edit `terraform.tfvars` with your credentials:
 - `selectel_domain` - Your account ID from https://my.selectel.ru/profile/apikeys
 - `selectel_username` - Your username
 - `selectel_password` - Your password
-- `ssh_key_name` - Name of your SSH key in Selectel
+- `openstack_password` - Password for the OpenStack service user
+- `ssh_public_key_path` - Path to your SSH public key (default: `~/.ssh/id_ed25519.pub`)
 
 ## Usage
 
@@ -87,9 +89,56 @@ disk_type        = "universal"
 The VM automatically:
 
 1. Updates packages
-2. Installs Docker, Node.js (via nvm), pnpm
+2. Installs Docker, Node.js 24, pnpm
 3. Clones the benchmark repository
 4. Runs `pnpm install`
 5. Creates `/root/benchmark-ready` marker when done
 
 After cloud-init completes (~3-5 minutes), you can SSH in and run benchmarks immediately.
+
+## MinIO Cluster (Optional)
+
+Deploy a production-grade MinIO cluster with erasure coding for S3 storage.
+
+### Configuration
+
+Add to `terraform.tfvars`:
+
+```hcl
+minio_enabled       = true
+minio_root_password = "your-secure-password"
+
+# Optional overrides
+minio_node_cpu      = 4   # vCPU per node (default: 4)
+minio_node_ram_gb   = 16  # RAM per node (default: 16)
+minio_drive_size_gb = 200 # Per drive (default: 200)
+minio_drives_per_node = 3 # Drives per node (default: 3)
+```
+
+### Architecture
+
+- **2 nodes × 3 drives** = 6 drives total
+- **Single erasure set** across all drives (EC:3)
+- **Usable capacity**: ~50% of raw storage (3 data + 3 parity)
+- **Fault tolerance**: Up to 3 drives OR 1 full node (3 drives)
+
+### Access
+
+MinIO is on the private network (no public IP). Access options:
+
+```bash
+# SSH tunnel from local machine
+ssh -L 9001:10.0.0.10:9001 -L 9000:10.0.0.10:9000 root@<benchmark-vm-ip>
+
+# Then open: http://localhost:9001 (console)
+# S3 API: http://localhost:9000
+```
+
+From the benchmark VM, use internal endpoints:
+
+- `http://10.0.0.10:9000`
+- `http://10.0.0.11:9000`
+
+### Credentials
+
+Default: `minioadmin` / `minioadmin123` (change via `minio_root_password`)

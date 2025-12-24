@@ -22,3 +22,11 @@ cpu_count    = 12
 ram_gb       = 96
 disk_size_gb = 200
 disk_type    = "fast"  # Options: fast, universal, basic, basic_hdd
+
+# MinIO Cluster (Optional)
+# Uncomment to deploy a 2-node MinIO cluster with erasure coding
+# minio_enabled       = true
+# minio_root_password = "SecureMinioPassword123!"
+# minio_node_cpu      = 4    # vCPU per node
+# minio_node_ram_gb   = 16   # RAM per node
+# minio_drive_size_gb = 200  # Size per drive (3 drives per node)
