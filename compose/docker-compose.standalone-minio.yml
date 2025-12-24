@@ -29,7 +29,6 @@ services:
 
   trino:
     environment:
-      - MINIO_HOST=${MINIO_HOST:-10.0.0.10}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY:-minioadmin}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
     volumes:
