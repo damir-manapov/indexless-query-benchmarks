@@ -4,7 +4,7 @@ terraform {
   required_providers {
     selectel = {
       source  = "selectel/selectel"
-      version = "~> 6.0"
+      version = "~> 7.0"
     }
     openstack = {
       source  = "terraform-provider-openstack/openstack"

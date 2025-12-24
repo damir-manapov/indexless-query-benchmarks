@@ -16,6 +16,7 @@ cp terraform.tfvars.example terraform.tfvars
 ```
 
 Edit `terraform.tfvars` with your credentials:
+
 - `selectel_domain` - Your account ID from https://my.selectel.ru/profile/apikeys
 - `selectel_username` - Your username
 - `selectel_password` - Your password
@@ -55,7 +56,7 @@ terraform destroy
 ### Disk Types
 
 | Type        | IOPS (read/write) | Throughput |
-|-------------|-------------------|------------|
+| ----------- | ----------------- | ---------- |
 | `fast`      | 25k/15k           | 500 MB/s   |
 | `universal` | up to 16k         | 200 MB/s   |
 | `basic`     | 640/320           | 150 MB/s   |
@@ -64,6 +65,7 @@ terraform destroy
 ### Example Configurations
 
 **Fast SSD, 96GB RAM:**
+
 ```hcl
 environment_name = "fast-ssd-96gb"
 cpu_count        = 12
@@ -72,6 +74,7 @@ disk_type        = "fast"
 ```
 
 **Universal SSD, 64GB RAM:**
+
 ```hcl
 environment_name = "universal-64gb"
 cpu_count        = 8
@@ -82,6 +85,7 @@ disk_type        = "universal"
 ## What Cloud-Init Does
 
 The VM automatically:
+
 1. Updates packages
 2. Installs Docker, Node.js (via nvm), pnpm
 3. Clones the benchmark repository

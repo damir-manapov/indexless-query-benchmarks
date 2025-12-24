@@ -46,15 +46,15 @@ Report: Total. Average: 1997.34 MiB/s, 332.96 obj/s
 
 One minio instance:
 
-* GET. Average: 592.90 MiB/s, 59.29 obj/s
-* PUT. Average: 197.60 MiB/s, 19.76 obj/s
-* Total. Average: 790.50 MiB/s, 131.76 obj/s
+- GET. Average: 592.90 MiB/s, 59.29 obj/s
+- PUT. Average: 197.60 MiB/s, 19.76 obj/s
+- Total. Average: 790.50 MiB/s, 131.76 obj/s
 
 Four minio instances on the same virtual machine:
 
-* GET. Average: 181.05 MiB/s, 18.11 obj/s
-* PUT. Average: 60.39 MiB/s, 6.04 obj/s
-* Total. Average: 241.44 MiB/s, 40.24 obj/s
+- GET. Average: 181.05 MiB/s, 18.11 obj/s
+- PUT. Average: 60.39 MiB/s, 6.04 obj/s
+- Total. Average: 241.44 MiB/s, 40.24 obj/s
 
 **The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel**
 

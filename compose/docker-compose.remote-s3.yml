@@ -1,6 +1,6 @@
 # Trino with remote S3 storage (Selectel Cloud Storage)
 # Usage: docker compose -f docker-compose.yml -f docker-compose.remote-s3.yml up -d trino
-# 
+#
 # Required environment variables:
 #   S3_ACCESS_KEY - Your S3 access key
 #   S3_SECRET_KEY - Your S3 secret key

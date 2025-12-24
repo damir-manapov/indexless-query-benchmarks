@@ -75,13 +75,13 @@ So writing is definetly linear. It was expected, but worth to check anyway.
 
 One locale minio instance:
 
-* 300m total, 100m batch ~1m 18s in 4m 14s, 1,253,772 r/s
-* 600m total, 100m batch ~1m 18s in 8m 17s, 1,274,608 r/s
+- 300m total, 100m batch ~1m 18s in 4m 14s, 1,253,772 r/s
+- 600m total, 100m batch ~1m 18s in 8m 17s, 1,274,608 r/s
 
 Cloud selectel S3:
 
-* 300m total, 100m batch
-* 600m total, 100m batch ~1m 4s in 6m 42s, 1,557,814 r/s
+- 300m total, 100m batch
+- 600m total, 100m batch ~1m 4s in 6m 42s, 1,557,814 r/s
 
 ### The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel
 
