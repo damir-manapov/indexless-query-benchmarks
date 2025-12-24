@@ -29,13 +29,25 @@ from optuna.samplers import TPESampler
 
 # Configuration space
 CONFIG_SPACE = {
-    "nodes": [2, 3, 4, 6],  # Variable node count
+    "nodes": [1, 2, 3, 4, 6],  # Variable node count (1 = single node)
     "cpu_per_node": [2, 4, 8, 12],
     "ram_per_node": [8, 16, 32, 64],
     "drives_per_node": [2, 3, 4],  # Variable drives per node
     "drive_size_gb": [100, 200, 400],
     "drive_type": ["fast", "universal"],
 }
+
+
+def calculate_ec_level(nodes: int, drives_per_node: int) -> int:
+    """Calculate erasure coding level based on total drives.
+    
+    MinIO uses EC:N where N = total_drives // 2, but requires at least 4 drives.
+    With fewer than 4 drives, EC is disabled (returns 0).
+    """
+    total_drives = nodes * drives_per_node
+    if total_drives >= 4:
+        return total_drives // 2
+    return 0  # No erasure coding
 
 TERRAFORM_DIR = Path(__file__).parent.parent.parent / "terraform"
 RESULTS_FILE = Path(__file__).parent / "results.json"
@@ -211,10 +223,15 @@ def save_result(result: BenchmarkResult, config: dict, trial_number: int) -> Non
         with open(RESULTS_FILE) as f:
             results = json.load(f)
     
+    ec_level = calculate_ec_level(config["nodes"], config["drives_per_node"])
+    total_drives = config["nodes"] * config["drives_per_node"]
+    
     results.append({
         "trial": trial_number,
         "timestamp": datetime.now().isoformat(),
         "config": config,
+        "total_drives": total_drives,
+        "ec_level": ec_level,
         "get_mib_s": result.get_mib_s,
         "put_mib_s": result.put_mib_s,
         "total_mib_s": result.total_mib_s,

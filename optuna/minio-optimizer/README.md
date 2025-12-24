@@ -35,16 +35,31 @@ uv run python optimizer.py --trials 20 --benchmark-vm-ip 81.177.222.139
 
 ## Configuration Space
 
-| Parameter       | Values          | Notes                 |
-| --------------- | --------------- | --------------------- |
-| nodes           | 2, 3, 4, 6      | Number of MinIO nodes |
-| cpu_per_node    | 2, 4, 8, 12     | vCPU per MinIO node   |
-| ram_per_node    | 8, 16, 32, 64   | GB per node           |
-| drives_per_node | 2, 3, 4         | Drives per node       |
-| drive_size_gb   | 100, 200, 400   | Size per drive        |
-| drive_type      | fast, universal | SSD tier              |
+| Parameter       | Values            | Notes                    |
+| --------------- | ----------------- | ------------------------ |
+| nodes           | 1, 2, 3, 4, 6     | Number of MinIO nodes    |
+| cpu_per_node    | 2, 4, 8, 12       | vCPU per MinIO node      |
+| ram_per_node    | 8, 16, 32, 64     | GB per node              |
+| drives_per_node | 2, 3, 4           | Drives per node          |
+| drive_size_gb   | 100, 200, 400     | Size per drive           |
+| drive_type      | fast, universal   | SSD tier                 |
 
-Total: ~1152 possible configurations (4×4×4×3×3×2)
+Total: ~1440 possible configurations (5×4×4×3×3×2)
+
+## Erasure Coding Levels
+
+EC level is automatically calculated and tracked:
+
+| Nodes | Drives/Node | Total | EC Level | Fault Tolerance    |
+|-------|-------------|-------|----------|--------------------|
+| 1     | 2           | 2     | 0        | None (no EC)       |
+| 1     | 3           | 3     | 0        | None (no EC)       |
+| 1     | 4           | 4     | 2        | 2 drive failures   |
+| 2     | 2           | 4     | 2        | 2 drive failures   |
+| 2     | 3           | 6     | 3        | 3 drive failures   |
+| 2     | 4           | 8     | 4        | 4 drive failures   |
+| 3     | 2           | 6     | 3        | 3 drive failures   |
+| 4     | 4           | 16    | 8        | 8 drive failures   |
 
 ## Output
 
@@ -56,12 +71,15 @@ Results are saved to `results.json`:
     "trial": 0,
     "timestamp": "2024-12-24T10:00:00",
     "config": {
+      "nodes": 2,
       "cpu_per_node": 8,
       "ram_per_node": 32,
       "drives_per_node": 3,
       "drive_size_gb": 200,
       "drive_type": "fast"
     },
+    "total_drives": 6,
+    "ec_level": 3,
     "get_mib_s": 450.5,
     "put_mib_s": 150.2,
     "total_mib_s": 600.7,
