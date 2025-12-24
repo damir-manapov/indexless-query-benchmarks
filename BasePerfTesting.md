@@ -57,9 +57,9 @@ warp mixed \
 
 **12 cpu (AMD EPYC 7763 64-Core Processor), 96 ram, fast ssd (25k/15k iops, 500mbs) - selectel, general load**
 
-* PUT. Average: 498.80 MiB/s, 49.88 obj/s
-* GET. Average: 1498.55 MiB/s, 149.85 obj/s
-* Total. Average: 1997.34 MiB/s, 332.96 obj/s
+- PUT. Average: 498.80 MiB/s, 49.88 obj/s
+- GET. Average: 1498.55 MiB/s, 149.85 obj/s
+- Total. Average: 1997.34 MiB/s, 332.96 obj/s
 
 **The same, but universal-2 ssd (up to 16k iops, 200mbs) - selectel**
 
@@ -77,34 +77,39 @@ Four minio instances on the same virtual machine, general load:
 
 Standalone two node 6 drives minio EC:3, 4cpu, 16ram 3x 200gb fast ssd, general load:
 
-* GET. Average: 263.48 MiB/s, 26.35 obj/s
-* PUT. Average: 91.47 MiB/s, 9.15 obj/s
-* Total. Average: 354.95 MiB/s, 58.42 obj/s
+- GET. Average: 263.48 MiB/s, 26.35 obj/s
+- PUT. Average: 91.47 MiB/s, 9.15 obj/s
+- Total. Average: 354.95 MiB/s, 58.42 obj/s
 
 Iceberg load 500obj:
-* GET. 324.29 MiB/s, 1.27 obj/s
-* PUT. 150.38 MiB/s, 0.59 obj/s
-* Total. Average: 364.45 MiB/s, 1.42 obj/s
+
+- GET. 324.29 MiB/s, 1.27 obj/s
+- PUT. 150.38 MiB/s, 0.59 obj/s
+- Total. Average: 364.45 MiB/s, 1.42 obj/s
 
 Iceberg load 100obj:
-* GET. Average: 338.82 MiB/s, 1.32 obj/s
-* PUT. Average: 164.82 MiB/s, 0.64 obj/s
-* Total. Average: 364.85 MiB/s, 1.47 obj/s
+
+- GET. Average: 338.82 MiB/s, 1.32 obj/s
+- PUT. Average: 164.82 MiB/s, 0.64 obj/s
+- Total. Average: 364.85 MiB/s, 1.47 obj/s
 
 Iceberg load 100obj 2:
-* GET. Average: 317.92 MiB/s, 1.24 obj/s
-* PUT. Average: 130.67 MiB/s, 0.51 obj/s
-* Total. Average: 357.45 MiB/s, 1.40 obj/s
+
+- GET. Average: 317.92 MiB/s, 1.24 obj/s
+- PUT. Average: 130.67 MiB/s, 0.51 obj/s
+- Total. Average: 357.45 MiB/s, 1.40 obj/s
 
 Iceberg load 50obj:
-* GET. Average: 321.76 MiB/s, 1.26 obj/s
-* PUT. Average: 234.50 MiB/s, 0.92 obj/s
-* Total. Average: 358.61 MiB/s, 1.48 obj/s
+
+- GET. Average: 321.76 MiB/s, 1.26 obj/s
+- PUT. Average: 234.50 MiB/s, 0.92 obj/s
+- Total. Average: 358.61 MiB/s, 1.48 obj/s
 
 Iceberg load 50obj 2:
-* GET. Average: 323.07 MiB/s, 1.26 obj/s
-* PUT. Average: 226.65 MiB/s, 0.89 obj/s
-* Total. Average: 359.60 MiB/s, 1.49 obj/s
+
+- GET. Average: 323.07 MiB/s, 1.26 obj/s
+- PUT. Average: 226.65 MiB/s, 0.89 obj/s
+- Total. Average: 359.60 MiB/s, 1.49 obj/s
 
 **The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel**
 
