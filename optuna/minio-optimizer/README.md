@@ -40,26 +40,29 @@ uv run python optimizer.py --trials 20 --benchmark-vm-ip 81.177.222.139
 | nodes           | 1, 2, 3, 4, 6     | Number of MinIO nodes    |
 | cpu_per_node    | 2, 4, 8, 12       | vCPU per MinIO node      |
 | ram_per_node    | 8, 16, 32, 64     | GB per node              |
-| drives_per_node | 2, 3, 4           | Drives per node          |
+| drives_per_node | 1, 2, 3, 4        | Drives per node          |
 | drive_size_gb   | 100, 200, 400     | Size per drive           |
 | drive_type      | fast, universal   | SSD tier                 |
 
-Total: ~1440 possible configurations (5×4×4×3×3×2)
+Total: ~1920 possible configurations (5×4×4×4×3×2)
 
 ## Erasure Coding Levels
 
 EC level is automatically calculated and tracked:
 
-| Nodes | Drives/Node | Total | EC Level | Fault Tolerance    |
-|-------|-------------|-------|----------|--------------------|
-| 1     | 2           | 2     | 0        | None (no EC)       |
-| 1     | 3           | 3     | 0        | None (no EC)       |
-| 1     | 4           | 4     | 2        | 2 drive failures   |
-| 2     | 2           | 4     | 2        | 2 drive failures   |
-| 2     | 3           | 6     | 3        | 3 drive failures   |
-| 2     | 4           | 8     | 4        | 4 drive failures   |
-| 3     | 2           | 6     | 3        | 3 drive failures   |
-| 4     | 4           | 16    | 8        | 8 drive failures   |
+| Nodes | Drives/Node | Total | EC Level | Fault Tolerance         |
+|-------|-------------|-------|----------|-------------------------|
+| 1     | 1           | 1     | 0        | None (single drive)     |
+| 2     | 1           | 2     | 0        | None (no EC)            |
+| 3     | 1           | 3     | 0        | None (no EC)            |
+| 4     | 1           | 4     | 2        | 2 drive/node failures   |
+| 6     | 1           | 6     | 3        | 3 drive/node failures   |
+| 1     | 2           | 2     | 0        | None (no EC)            |
+| 1     | 4           | 4     | 2        | 2 drive failures        |
+| 2     | 2           | 4     | 2        | 2 drive failures        |
+| 2     | 3           | 6     | 3        | 3 drive failures        |
+| 2     | 4           | 8     | 4        | 4 drive failures        |
+| 4     | 4           | 16    | 8        | 8 drive failures        |
 
 ## Output
 

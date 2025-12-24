@@ -32,7 +32,7 @@ CONFIG_SPACE = {
     "nodes": [1, 2, 3, 4, 6],  # Variable node count (1 = single node)
     "cpu_per_node": [2, 4, 8, 12],
     "ram_per_node": [8, 16, 32, 64],
-    "drives_per_node": [2, 3, 4],  # Variable drives per node
+    "drives_per_node": [1, 2, 3, 4],  # Variable drives per node
     "drive_size_gb": [100, 200, 400],
     "drive_type": ["fast", "universal"],
 }
