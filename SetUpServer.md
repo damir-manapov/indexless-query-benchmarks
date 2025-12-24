@@ -5,7 +5,7 @@ apt update
 apt upgrade -y
 
 # git
-apt install -y git curl fio
+apt install -y git curl fio htop moreutils
 
 # nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash

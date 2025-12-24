@@ -80,6 +80,9 @@ One locale minio instance:
 
 Cloud selectel S3:
 
+* 300m total, 100m batch
+* 600m total, 100m batch ~1m 4s in 6m 42s, 1,557,814 r/s
+
 ### The same, but universal-1 ssd (7k/4k iops, 200mbs) - selectel
 
 ### The same, but base ssd (640/320 iops, 150mbs) - selectel

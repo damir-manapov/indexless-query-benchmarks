@@ -72,7 +72,7 @@ resource "openstack_compute_flavor_v2" "benchmark" {
   name      = "benchmark-${var.cpu_count}vcpu-${var.ram_gb}gb"
   vcpus     = var.cpu_count
   ram       = var.ram_gb * 1024
-  disk      = 0  # Using network boot disk
+  disk      = 0 # Using network boot disk
   is_public = false
 
   lifecycle {
