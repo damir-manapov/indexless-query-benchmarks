@@ -127,13 +127,13 @@ def seed_study_from_results(study: optuna.Study) -> int:
 @dataclass
 class BenchmarkResult:
     config: dict
-    get_mib_s: float
-    put_mib_s: float
-    total_mib_s: float
-    get_obj_s: float
-    put_obj_s: float
-    total_obj_s: float
-    duration_s: float
+    get_mib_s: float = 0.0
+    put_mib_s: float = 0.0
+    total_mib_s: float = 0.0
+    get_obj_s: float = 0.0
+    put_obj_s: float = 0.0
+    total_obj_s: float = 0.0
+    duration_s: float = 0.0
     # Data generation metrics (Trino/Iceberg ingestion)
     gen_rows: int = 0
     gen_duration_s: float = 0.0
@@ -220,6 +220,30 @@ def deploy_minio(config: dict) -> bool:
     # Wait for MinIO to be ready
     print("  Waiting for MinIO to initialize (90s)...")
     time.sleep(90)
+
+    return True
+
+
+def restart_trino(vm_ip: str) -> bool:
+    """Restart Trino on benchmark VM to reconnect to new MinIO."""
+    print("  Restarting Trino on benchmark VM...")
+
+    # Restart compose with standalone-minio config
+    restart_cmd = (
+        "cd /root/indexless-query-benchmarks && "
+        "pnpm compose:down 2>/dev/null; "
+        "pnpm compose:up:trino:64gb:standalone-minio"
+    )
+
+    code, stdout, stderr = run_command(["ssh", f"root@{vm_ip}", restart_cmd])
+
+    if code != 0:
+        print(f"  Trino restart failed: {stderr}")
+        return False
+
+    # Wait for Trino to be ready
+    print("  Waiting for Trino to start (30s)...")
+    time.sleep(30)
 
     return True
 
@@ -330,16 +354,18 @@ def run_generation_benchmark(
     output = stdout + stderr
 
     if code != 0:
-        print(f"  Generation failed: {output[:500]}")
-        return None
+        print(f"  Generation exit code {code}, attempting to parse anyway...")
+        print(f"  Last 500 chars: ...{output[-500:]}")
 
     # Parse the JSON report output
     # Look for the generation report JSON file path
     json_match = re.search(r"Generated JSON report: ([\w/\-\.]+)", output)
     if json_match:
         json_path = json_match.group(1)
+        # The path is relative to project dir, make it absolute
+        full_json_path = f"/root/indexless-query-benchmarks/{json_path}"
         # Read the JSON report from remote
-        cat_cmd = ["ssh", f"root@{vm_ip}", f"cat {json_path}"]
+        cat_cmd = ["ssh", f"root@{vm_ip}", f"cat {full_json_path}"]
         code, json_output, _ = run_command(cat_cmd)
         if code == 0:
             try:
@@ -490,12 +516,16 @@ def objective(
     if not deploy_minio(config):
         return 0.0  # Failed deployment
 
-    # Warp benchmark (raw S3 throughput)
-    result = run_warp_benchmark(vm_ip)
-    if result is None:
-        return 0.0  # Failed benchmark
+    # Restart Trino to connect to new MinIO
+    if gen_rows > 0:
+        if not restart_trino(vm_ip):
+            print("  Warning: Trino restart failed, generation may fail")
 
-    result.config = config
+    # Skip warp benchmark - use generation as primary KPI
+    # result = run_warp_benchmark(vm_ip)
+    # if result is None:
+    #     return 0.0  # Failed benchmark
+    result = BenchmarkResult(config=config)
 
     # Data generation benchmark (Trino/Iceberg ingestion)
     if gen_rows > 0:
@@ -507,22 +537,22 @@ def objective(
             result.gen_duration_s = gen_result["gen_duration_s"]
             result.gen_rows_per_sec = gen_result["gen_rows_per_sec"]
             result.gen_batch_durations = gen_result["gen_batch_durations"]
+        else:
+            return 0.0  # Generation failed
     else:
         gen_result = None
 
     save_result(result, config, trial.number)
 
-    # Objective: maximize throughput per cost
+    # Objective: maximize generation throughput
     cost = calculate_cost(config)
-    score = result.total_mib_s / cost if cost > 0 else 0
+    score = result.gen_rows_per_sec / cost if cost > 0 else 0
 
     print(
-        f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}, Score: {score:.2f}"
+        f"  Result: {result.gen_rows_per_sec:,.0f} rows/sec, Cost: {cost:.2f}, Score: {score:.2f}"
     )
-    if gen_result:
-        print(f"  Generation: {result.gen_rows_per_sec:,.0f} rows/sec")
 
-    return result.total_mib_s  # Or use score for cost-efficiency
+    return result.gen_rows_per_sec  # Use generation throughput as KPI
 
 
 def main():
@@ -581,7 +611,7 @@ def main():
     if existing_trials > 0:
         print(f"Resuming study with {existing_trials} existing trials")
         if study.best_trial:
-            print(f"Current best: {study.best_trial.value:.1f} MiB/s")
+            print(f"Current best: {study.best_trial.value:,.0f} rows/s")
     print()
 
     study.optimize(
@@ -597,13 +627,13 @@ def main():
     print("=" * 60)
     print(f"Best trial: {study.best_trial.number}")
     print(f"Best config: {study.best_trial.params}")
-    print(f"Best throughput: {study.best_trial.value:.1f} MiB/s")
+    print(f"Best throughput: {study.best_trial.value:,.0f} rows/s")
 
     # Print all trials
     print("\nAll trials:")
     for trial in study.trials:
         if trial.value:
-            print(f"  Trial {trial.number}: {trial.value:.1f} MiB/s - {trial.params}")
+            print(f"  Trial {trial.number}: {trial.value:,.0f} rows/s - {trial.params}")
 
 
 if __name__ == "__main__":
