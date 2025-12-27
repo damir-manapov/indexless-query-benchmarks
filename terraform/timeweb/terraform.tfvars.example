@@ -1,0 +1,18 @@
+# Environment name for resource naming
+environment_name = "fast-nvme-96gb"
+
+# Timeweb Cloud location
+# Options: ru-1, ru-2, pl-1, kz-1
+location = "ru-1"
+
+# VM Configuration
+cpu_count    = 12
+ram_gb       = 96
+disk_size_gb = 200
+
+# Disk type
+# Options: nvme, ssd, hdd
+disk_type = "nvme"
+
+# SSH key path
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
