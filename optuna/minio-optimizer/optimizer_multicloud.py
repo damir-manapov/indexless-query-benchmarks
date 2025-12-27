@@ -3,16 +3,17 @@
 Multi-Cloud MinIO Configuration Optimizer using Bayesian Optimization (Optuna).
 
 Supports both Selectel and Timeweb Cloud providers.
+Automatically creates benchmark VM if not provided.
 
 Usage:
-    python optimizer_multicloud.py --cloud timeweb --trials 10 --benchmark-vm-ip 1.2.3.4
-    python optimizer_multicloud.py --cloud selectel --trials 10 --benchmark-vm-ip 1.2.3.4
+    python optimizer_multicloud.py --cloud timeweb --trials 5
+    python optimizer_multicloud.py --cloud selectel --trials 10 --no-destroy
+    python optimizer_multicloud.py --cloud timeweb --benchmark-vm-ip 1.2.3.4 --trials 10
 """
 
 import argparse
 import json
 import re
-import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,7 +22,7 @@ from typing import Any
 
 import optuna
 from optuna.samplers import TPESampler
-from optuna.trial import TrialState
+from python_terraform import Terraform
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
 
@@ -44,17 +45,7 @@ class BenchmarkResult:
     put_obj_s: float = 0.0
     total_obj_s: float = 0.0
     duration_s: float = 0.0
-    gen_rows: int = 0
-    gen_duration_s: float = 0.0
-    gen_rows_per_sec: float = 0.0
-    gen_batch_durations: list[float] | None = None
     error: str | None = None
-
-
-def run_command(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
-    """Run a command and return exit code, stdout, stderr."""
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-    return result.returncode, result.stdout, result.stderr
 
 
 def config_to_key(config: dict) -> str:
@@ -90,104 +81,165 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     return None
 
 
-def update_tfvars_selectel(config: dict, terraform_dir: Path) -> None:
-    """Update terraform.tfvars for Selectel."""
-    tfvars_path = terraform_dir / "terraform.tfvars"
+def run_ssh_command(vm_ip: str, command: str, timeout: int = 300) -> tuple[int, str]:
+    """Run command on remote VM via SSH."""
+    import subprocess
     
-    with open(tfvars_path) as f:
-        content = f.read()
-
-    replacements = {
-        r"minio_node_count\s*=\s*\d+": f"minio_node_count    = {config['nodes']}",
-        r"minio_node_cpu\s*=\s*\d+": f"minio_node_cpu      = {config['cpu_per_node']}",
-        r"minio_node_ram_gb\s*=\s*\d+": f"minio_node_ram_gb   = {config['ram_per_node']}",
-        r"minio_drives_per_node\s*=\s*\d+": f"minio_drives_per_node = {config['drives_per_node']}",
-        r"minio_drive_size_gb\s*=\s*\d+": f"minio_drive_size_gb = {config['drive_size_gb']}",
-        r"minio_drive_type\s*=\s*\"[^\"]+\"": f'minio_drive_type    = "{config["drive_type"]}"',
-    }
-
-    for pattern, replacement in replacements.items():
-        if re.search(pattern, content):
-            content = re.sub(pattern, replacement, content)
-        else:
-            content += f"\n{replacement}\n"
-
-    with open(tfvars_path, "w") as f:
-        f.write(content)
+    result = subprocess.run(
+        [
+            "ssh",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=10",
+            f"root@{vm_ip}",
+            command,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    return result.returncode, result.stdout + result.stderr
 
 
-def taint_resources_selectel(config: dict, terraform_dir: Path) -> None:
-    """Taint Selectel resources to force recreation."""
-    taint_resources = []
+def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
+    """Wait for benchmark VM to be ready (cloud-init complete)."""
+    print(f"  Waiting for VM {vm_ip} to be ready...")
     
-    for i in range(config["nodes"]):
-        taint_resources.append(f"openstack_compute_instance_v2.minio[{i}]")
-        taint_resources.append(f"openstack_blockstorage_volume_v3.minio_boot[{i}]")
-        taint_resources.append(f"openstack_networking_port_v2.minio[{i}]")
-
-    total_drives = config["nodes"] * config["drives_per_node"]
-    for i in range(total_drives):
-        taint_resources.append(f"openstack_blockstorage_volume_v3.minio_data[{i}]")
-
-    for resource in taint_resources:
-        run_command(["terraform", "taint", resource], cwd=terraform_dir)
-
-
-def taint_resources_timeweb(config: dict, terraform_dir: Path) -> None:
-    """Taint Timeweb resources to force recreation."""
-    taint_resources = []
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            code, _ = run_ssh_command(vm_ip, "test -f /root/benchmark-ready", timeout=15)
+            if code == 0:
+                print("  VM is ready!")
+                return True
+        except Exception as e:
+            print(f"  SSH not ready yet: {e}")
+        time.sleep(10)
     
-    for i in range(config["nodes"]):
-        taint_resources.append(f"twc_server.minio[{i}]")
+    print(f"  Warning: VM not ready after {timeout}s, continuing anyway...")
+    return False
 
-    total_drives = config["nodes"] * config["drives_per_node"]
-    for i in range(total_drives):
-        taint_resources.append(f"twc_server_disk.minio_data[{i}]")
 
-    for resource in taint_resources:
-        run_command(["terraform", "taint", resource], cwd=terraform_dir)
+def get_terraform(cloud_config: CloudConfig) -> Terraform:
+    """Get Terraform instance, initializing if needed."""
+    tf_dir = str(cloud_config.terraform_dir)
+    tf = Terraform(working_dir=tf_dir)
+    
+    # Check if init needed
+    terraform_dir = cloud_config.terraform_dir / ".terraform"
+    if not terraform_dir.exists():
+        print(f"  Initializing Terraform in {tf_dir}...")
+        ret_code, stdout, stderr = tf.init()
+        if ret_code != 0:
+            raise RuntimeError(f"Terraform init failed: {stderr}")
+    
+    return tf
+
+
+def get_tf_output(tf: Terraform, name: str) -> str | None:
+    """Get terraform output value, handling different return formats."""
+    try:
+        # Use output_cmd to get raw output and parse it ourselves
+        ret, out, err = tf.output_cmd(name)
+        if ret != 0 or not out:
+            return None
+        # Output is JSON-formatted, strip quotes and newlines
+        value = out.strip().strip('"')
+        return value if value else None
+    except Exception:
+        return None
+
+
+def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
+    """Ensure benchmark VM exists and return its IP."""
+    print(f"\nChecking benchmark VM for {cloud_config.name}...")
+    
+    tf = get_terraform(cloud_config)
+    
+    # Check if VM already exists
+    vm_ip = get_tf_output(tf, "vm_ip")
+    if vm_ip:
+        print(f"  Benchmark VM already exists: {vm_ip}")
+        return vm_ip
+    
+    # Create VM
+    print("  Creating benchmark VM...")
+    ret_code, stdout, stderr = tf.apply(skip_plan=True)
+    
+    if ret_code != 0:
+        raise RuntimeError(f"Failed to create benchmark VM: {stderr}")
+    
+    # Get IP
+    vm_ip = get_tf_output(tf, "vm_ip")
+    if not vm_ip:
+        raise RuntimeError("Benchmark VM created but no IP returned")
+    
+    print(f"  Benchmark VM created: {vm_ip}")
+    
+    # Wait for VM to be ready
+    wait_for_vm_ready(vm_ip)
+    
+    return vm_ip
 
 
 def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
     """Deploy MinIO cluster with given configuration."""
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
     
-    terraform_dir = cloud_config.terraform_dir
+    tf = get_terraform(cloud_config)
     
     # Build variables for terraform apply
     tf_vars = {
-        "minio_enabled": "true",
-        "minio_node_count": str(config["nodes"]),
-        "minio_node_cpu": str(config["cpu_per_node"]),
-        "minio_node_ram_gb": str(config["ram_per_node"]),
-        "minio_drives_per_node": str(config["drives_per_node"]),
-        "minio_drive_size_gb": str(config["drive_size_gb"]),
+        "minio_enabled": True,
+        "minio_node_count": config["nodes"],
+        "minio_node_cpu": config["cpu_per_node"],
+        "minio_node_ram_gb": config["ram_per_node"],
+        "minio_drives_per_node": config["drives_per_node"],
+        "minio_drive_size_gb": config["drive_size_gb"],
+        "minio_drive_type": config["drive_type"],
     }
     
-    # Build -var arguments
-    var_args = []
-    for key, value in tf_vars.items():
-        var_args.extend(["-var", f"{key}={value}"])
-    
-    # For Selectel, also update tfvars file
-    if cloud_config.name == "selectel":
-        update_tfvars_selectel(config, terraform_dir)
-        taint_resources_selectel(config, terraform_dir)
-    else:
-        # For Timeweb, use -var for all including drive_type
-        var_args.extend(["-var", f"minio_drive_type={config['drive_type']}"])
-        taint_resources_timeweb(config, terraform_dir)
-    
-    # Apply
-    cmd = ["terraform", "apply", "-auto-approve"] + var_args
-    code, stdout, stderr = run_command(cmd, cwd=terraform_dir)
+    # Apply with variables
+    ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
-    if code != 0:
+    if ret_code != 0:
         print(f"  Terraform apply failed: {stderr}")
         return False
 
     print("  Waiting for MinIO to initialize (90s)...")
     time.sleep(90)
+    return True
+
+
+def destroy_minio(cloud_config: CloudConfig) -> bool:
+    """Destroy MinIO cluster but keep benchmark VM."""
+    print(f"  Destroying MinIO on {cloud_config.name}...")
+    
+    tf = get_terraform(cloud_config)
+    
+    # Apply with minio_enabled=false to destroy MinIO but keep VM
+    ret_code, stdout, stderr = tf.apply(skip_plan=True, var={"minio_enabled": False})
+    
+    if ret_code != 0:
+        print(f"  Warning: MinIO destroy may have failed: {stderr}")
+        return False
+    
+    return True
+
+
+def destroy_all(cloud_config: CloudConfig) -> bool:
+    """Destroy all infrastructure."""
+    print(f"\nDestroying all resources on {cloud_config.name}...")
+    
+    tf = get_terraform(cloud_config)
+    
+    # Use auto_approve for destroy (force is deprecated)
+    ret_code, stdout, stderr = tf.destroy(auto_approve=True)
+    
+    if ret_code != 0:
+        print(f"  Warning: Destroy may have failed: {stderr}")
+        return False
+    
+    print("  All resources destroyed.")
     return True
 
 
@@ -208,10 +260,14 @@ def run_warp_benchmark(vm_ip: str, minio_ip: str = "10.0.0.10") -> BenchmarkResu
     )
 
     start_time = time.time()
-    code, stdout, stderr = run_command(["ssh", f"root@{vm_ip}", warp_cmd])
+    try:
+        code, output = run_ssh_command(vm_ip, warp_cmd, timeout=600)
+    except Exception as e:
+        print(f"  Warp failed: {e}")
+        return None
+    
     duration = time.time() - start_time
 
-    output = stdout + stderr
     if code != 0:
         print(f"  Warp failed: {output[:500]}")
         return None
@@ -239,6 +295,9 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult:
         if match:
             result[f"{key}_mib_s"] = float(match.group(1))
             result[f"{key}_obj_s"] = float(match.group(2))
+
+    if result["total_mib_s"] == 0:
+        print(f"  Warning: Could not parse warp output. Sample: {output[:300]}...")
 
     return BenchmarkResult(
         config={},
@@ -320,7 +379,9 @@ def objective(
         "drive_type": trial.suggest_categorical("drive_type", config_space["drive_type"]),
     }
 
-    print(f"\nTrial {trial.number} [{cloud}]: {config}")
+    print(f"\n{'='*60}")
+    print(f"Trial {trial.number} [{cloud}]: {config}")
+    print(f"{'='*60}")
 
     # Check cache
     cached = find_cached_result(config, cloud)
@@ -328,48 +389,101 @@ def objective(
         print(f"  Using cached result: {cached['total_mib_s']:.1f} MiB/s")
         return cached["total_mib_s"]
 
-    # Deploy
+    # Deploy MinIO
     if not deploy_minio(config, cloud_config):
+        save_result(
+            BenchmarkResult(config=config, error="Deploy failed"),
+            config, trial.number, cloud, cloud_config
+        )
         return 0.0
 
     # Run benchmark
     result = run_warp_benchmark(vm_ip)
     if result is None:
+        save_result(
+            BenchmarkResult(config=config, error="Benchmark failed"),
+            config, trial.number, cloud, cloud_config
+        )
         return 0.0
 
     result.config = config
     save_result(result, config, trial.number, cloud, cloud_config)
 
     cost = calculate_cost(config, cloud_config)
-    print(f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}")
+    print(f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr")
 
     return result.total_mib_s
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Multi-Cloud MinIO Optimizer")
+    parser = argparse.ArgumentParser(
+        description="Multi-Cloud MinIO Optimizer",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run 5 trials on Timeweb (auto-create VM, destroy at end)
+  python optimizer_multicloud.py --cloud timeweb --trials 5
+
+  # Run on Timeweb, keep infrastructure after
+  python optimizer_multicloud.py --cloud timeweb --trials 5 --no-destroy
+
+  # Use existing VM
+  python optimizer_multicloud.py --cloud timeweb --trials 5 --benchmark-vm-ip 1.2.3.4
+        """,
+    )
     parser.add_argument(
         "--cloud", 
         choices=["selectel", "timeweb"], 
         required=True,
         help="Cloud provider",
     )
-    parser.add_argument("--trials", type=int, default=10, help="Number of trials")
-    parser.add_argument("--benchmark-vm-ip", required=True, help="Benchmark VM IP")
-    parser.add_argument("--study-name", default=None, help="Optuna study name (default: minio-{cloud})")
+    parser.add_argument(
+        "--trials", 
+        type=int, 
+        default=5, 
+        help="Number of trials (default: 5)",
+    )
+    parser.add_argument(
+        "--benchmark-vm-ip", 
+        default=None,
+        help="Benchmark VM IP (auto-created if not provided)",
+    )
+    parser.add_argument(
+        "--study-name", 
+        default=None, 
+        help="Optuna study name (default: minio-{cloud})",
+    )
+    parser.add_argument(
+        "--no-destroy",
+        action="store_true",
+        help="Keep infrastructure after optimization (default: destroy)",
+    )
     args = parser.parse_args()
 
     cloud_config = get_cloud_config(args.cloud)
     study_name = args.study_name or f"minio-{args.cloud}"
 
-    print(f"Starting MinIO optimization on {args.cloud.upper()}")
+    print("=" * 60)
+    print(f"MinIO Optimizer - {args.cloud.upper()}")
+    print("=" * 60)
     print(f"Trials: {args.trials}")
-    print(f"Benchmark VM: {args.benchmark_vm_ip}")
     print(f"Terraform dir: {cloud_config.terraform_dir}")
     print(f"Results file: {results_file(args.cloud)}")
     print(f"Disk types: {cloud_config.disk_types}")
+    print(f"Destroy at end: {not args.no_destroy}")
     print()
 
+    # Ensure benchmark VM exists
+    if args.benchmark_vm_ip:
+        vm_ip = args.benchmark_vm_ip
+        print(f"Using provided benchmark VM: {vm_ip}")
+    else:
+        vm_ip = ensure_benchmark_vm(cloud_config)
+
+    print(f"\nBenchmark VM IP: {vm_ip}")
+    print()
+
+    # Create/load Optuna study
     storage = f"sqlite:///{STUDY_DB}"
     study = optuna.create_study(
         study_name=study_name,
@@ -386,18 +500,34 @@ def main():
             print(f"Current best: {study.best_trial.value:.1f} MiB/s")
     print()
 
-    study.optimize(
-        lambda trial: objective(trial, args.cloud, cloud_config, args.benchmark_vm_ip),
-        n_trials=args.trials,
-        show_progress_bar=True,
-    )
+    try:
+        # Run optimization
+        study.optimize(
+            lambda trial: objective(trial, args.cloud, cloud_config, vm_ip),
+            n_trials=args.trials,
+            show_progress_bar=True,
+        )
 
-    print("\n" + "=" * 60)
-    print(f"OPTIMIZATION COMPLETE ({args.cloud.upper()})")
-    print("=" * 60)
-    print(f"Best trial: {study.best_trial.number}")
-    print(f"Best config: {study.best_trial.params}")
-    print(f"Best throughput: {study.best_trial.value:.1f} MiB/s")
+        # Print results
+        print("\n" + "=" * 60)
+        print(f"OPTIMIZATION COMPLETE ({args.cloud.upper()})")
+        print("=" * 60)
+        
+        if study.best_trial:
+            print(f"Best trial: {study.best_trial.number}")
+            print(f"Best config: {study.best_trial.params}")
+            print(f"Best throughput: {study.best_trial.value:.1f} MiB/s")
+            
+            # Calculate cost for best config
+            best_cost = calculate_cost(study.best_trial.params, cloud_config)
+            print(f"Best config cost: {best_cost:.2f}/hr")
+
+    finally:
+        # Cleanup
+        if not args.no_destroy:
+            destroy_all(cloud_config)
+        else:
+            print("\n--no-destroy specified, keeping infrastructure.")
 
 
 if __name__ == "__main__":

@@ -53,6 +53,15 @@ resource "twc_server" "benchmark" {
   ssh_keys_ids = [twc_ssh_key.benchmark.id]
   project_id   = twc_project.benchmark.id
 
+  # Connect to MinIO VPC if enabled
+  dynamic "local_network" {
+    for_each = var.minio_enabled ? [1] : []
+    content {
+      id = twc_vpc.minio[0].id
+      ip = "10.0.0.100"  # Benchmark VM gets .100 in the VPC
+    }
+  }
+
   # Cloud-init script for initial setup
   cloud_init = <<-EOF
     #cloud-config
@@ -71,6 +80,8 @@ resource "twc_server" "benchmark" {
       - systemctl enable docker
       - systemctl start docker
       - usermod -aG docker root
+      - curl -L https://github.com/minio/warp/releases/download/v1.0.8/warp_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin/ warp
+      - chmod +x /usr/local/bin/warp
       - touch /root/benchmark-ready
   EOF
 }
