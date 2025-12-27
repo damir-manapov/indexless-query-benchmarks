@@ -59,7 +59,6 @@ resource "twc_server" "benchmark" {
     package_update: true
     packages:
       - docker.io
-      - docker-compose
       - htop
       - iotop
       - mc

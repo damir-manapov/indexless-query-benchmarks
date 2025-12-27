@@ -20,13 +20,13 @@ variable "location" {
 variable "cpu_count" {
   description = "Number of vCPUs"
   type        = number
-  default     = 12
+  default     = 4
 }
 
 variable "ram_gb" {
   description = "RAM in GB"
   type        = number
-  default     = 96
+  default     = 4
 }
 
 variable "disk_size_gb" {
