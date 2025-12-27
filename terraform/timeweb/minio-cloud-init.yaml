@@ -1,0 +1,83 @@
+#cloud-config
+package_update: true
+
+packages:
+  - wget
+  - xfsprogs
+
+runcmd:
+  # Wait for disks to be attached
+  - sleep 30
+
+  # Add hostnames for MinIO cluster
+%{ for i in range(node_count) ~}
+  - echo '10.0.0.${10 + i} minio${i + 1}' >> /etc/hosts
+%{ endfor ~}
+
+  # Format data drives
+%{ for i in range(drives_per_node) ~}
+  - mkfs.xfs -f /dev/vd${drive_letters[i]}
+%{ endfor ~}
+
+  # Create mount points
+  - mkdir -p%{ for i in range(1, drives_per_node + 1) } /data${i}%{ endfor }
+
+  # Mount drives
+%{ for i in range(drives_per_node) ~}
+  - mount /dev/vd${drive_letters[i]} /data${i + 1}
+%{ endfor ~}
+
+  # Add to fstab
+%{ for i in range(drives_per_node) ~}
+  - echo '/dev/vd${drive_letters[i]} /data${i + 1} xfs defaults,noatime 0 2' >> /etc/fstab
+%{ endfor ~}
+
+  # Install MinIO server and client
+  - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
+  - wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
+  - chmod +x /usr/local/bin/minio /usr/local/bin/mc
+
+  # Create minio user
+  - useradd -r -s /sbin/nologin minio-user
+  - chown -R minio-user:minio-user%{ for i in range(1, drives_per_node + 1) } /data${i}%{ endfor }
+
+  # Create MinIO environment file
+  - |
+    cat > /etc/default/minio << 'ENVFILE'
+    MINIO_ROOT_USER="${root_user}"
+    MINIO_ROOT_PASSWORD="${root_password}"
+    MINIO_VOLUMES="${volume_spec}"
+    MINIO_OPTS="--console-address :9001"
+    ENVFILE
+
+  # Create systemd service
+  - |
+    cat > /etc/systemd/system/minio.service << 'SERVICE'
+    [Unit]
+    Description=MinIO
+    Documentation=https://min.io/docs/minio
+    Wants=network-online.target
+    After=network-online.target
+
+    [Service]
+    User=minio-user
+    Group=minio-user
+    EnvironmentFile=/etc/default/minio
+    ExecStart=/usr/local/bin/minio server $MINIO_VOLUMES $MINIO_OPTS
+    Restart=always
+    RestartSec=5
+    LimitNOFILE=65536
+
+    [Install]
+    WantedBy=multi-user.target
+    SERVICE
+
+  # Start MinIO
+  - systemctl daemon-reload
+  - systemctl enable minio
+  - systemctl start minio
+
+  # Create ready marker
+  - touch /root/minio-ready
+
+final_message: "MinIO node ready after $UPTIME seconds"
