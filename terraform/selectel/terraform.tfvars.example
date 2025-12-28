@@ -1,14 +1,10 @@
 # Selectel Account Credentials
-# Find these in: https://my.selectel.ru/profile/apikeys
-selectel_domain   = "123456"           # Your account ID
-selectel_username = "your-username"
-selectel_password = "your-password"
-
-# Password for the OpenStack service user (create your own)
-openstack_password = "SecurePassword123!"
-
-# Path to SSH public key (will be uploaded to Selectel)
-ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+# Set via environment variables:
+#   export TF_VAR_selectel_domain="123456"
+#   export TF_VAR_selectel_username="your-username"
+#   export TF_VAR_selectel_password="your-password"
+#   export TF_VAR_openstack_password="your-openstack-password"
+# Get credentials from: https://my.selectel.ru/profile/apikeys
 
 # Environment name (used in resource naming)
 environment_name = "fast-ssd-96gb"

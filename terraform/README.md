@@ -38,15 +38,16 @@ terraform/
 ```bash
 cd terraform/selectel
 cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your settings
+
+# Set credentials via environment variables
+export TF_VAR_selectel_domain="123456"
+export TF_VAR_selectel_username="your-username"
+export TF_VAR_selectel_password="your-password"
+export TF_VAR_openstack_password="your-openstack-password"
 ```
 
-Edit `terraform.tfvars` with your credentials:
-
-- `selectel_domain` - Your account ID from https://my.selectel.ru/profile/apikeys
-- `selectel_username` - Your username
-- `selectel_password` - Your password
-- `openstack_password` - Password for the OpenStack service user
-- `ssh_public_key_path` - Path to your SSH public key (default: `~/.ssh/id_ed25519.pub`)
+Get credentials from https://my.selectel.ru/profile/apikeys
 
 ### Timeweb
 

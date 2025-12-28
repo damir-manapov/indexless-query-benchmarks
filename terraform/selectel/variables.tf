@@ -1,24 +1,34 @@
 # Selectel Account Credentials
+# Set via environment variables:
+#   export TF_VAR_selectel_domain="123456"
+#   export TF_VAR_selectel_username="your-username"
+#   export TF_VAR_selectel_password="your-password"
+#   export TF_VAR_openstack_password="your-openstack-password"
+
 variable "selectel_domain" {
   description = "Selectel account domain (account ID)"
   type        = string
+  default     = null
 }
 
 variable "selectel_username" {
   description = "Selectel username"
   type        = string
+  default     = null
 }
 
 variable "selectel_password" {
   description = "Selectel password"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "openstack_password" {
   description = "Password for OpenStack service user"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 # Environment
