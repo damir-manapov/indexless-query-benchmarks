@@ -87,6 +87,8 @@ The following ports are opened:
 
 The VM is automatically configured with:
 
-- Docker & Docker Compose
-- htop, iotop, mc, git, curl, wget, unzip
+- Docker
+- Node.js 24 + pnpm
+- warp (MinIO benchmark tool)
+- Clones and installs `indexless-query-benchmarks` repo
 - A `/root/benchmark-ready` marker file created when setup is complete

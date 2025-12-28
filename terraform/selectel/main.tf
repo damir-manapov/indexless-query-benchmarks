@@ -171,54 +171,13 @@ resource "openstack_blockstorage_volume_v3" "boot" {
   availability_zone = var.availability_zone
 }
 
-# Cloud-init script
-locals {
-  cloud_init = <<-EOF
-    #cloud-config
-    package_update: true
-    package_upgrade: true
-
-    packages:
-      - git
-      - curl
-      - fio
-      - build-essential
-
-    runcmd:
-      # Docker
-      - curl -fsSL https://get.docker.com | sh
-
-      # Install warp (MinIO benchmark tool)
-      - curl -L https://github.com/minio/warp/releases/download/v1.0.8/warp_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin/ warp
-      - chmod +x /usr/local/bin/warp
-
-      # Node.js via NodeSource (more reliable than NVM in cloud-init)
-      - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-      - apt-get install -y nodejs
-
-      # PNPM via npm (more reliable than install script)
-      - npm install -g pnpm
-
-      # Clone and setup project
-      - cd /root
-      - git clone https://github.com/damir-manapov/indexless-query-benchmarks.git
-      - cd indexless-query-benchmarks
-      - pnpm install
-
-      # Create ready marker
-      - touch /root/benchmark-ready
-
-    final_message: "Benchmark VM ready after $UPTIME seconds"
-  EOF
-}
-
 # Compute instance
 resource "openstack_compute_instance_v2" "benchmark" {
   name              = "benchmark-${var.environment_name}"
   flavor_id         = openstack_compute_flavor_v2.benchmark.id
   key_pair          = selectel_vpc_keypair_v2.benchmark.name
   availability_zone = var.availability_zone
-  user_data         = local.cloud_init
+  user_data         = file("${path.module}/../benchmark-cloud-init.yaml")
 
   network {
     port = openstack_networking_port_v2.benchmark.id

@@ -148,114 +148,26 @@ resource "openstack_networking_port_v2" "minio" {
   ]
 }
 
-# Cloud-init for MinIO nodes - generates dynamic /etc/hosts and volume spec
+# Cloud-init template variables
 locals {
-  # Generate /etc/hosts entries for all nodes
-  minio_hosts_entries = join("\n", [
-    for i in range(var.minio_node_count) : "      - echo '10.0.0.${10 + i} minio${i + 1}' >> /etc/hosts"
-  ])
-
   # Generate device letters (sdb, sdc, sdd, ...)
   drive_letters = [for i in range(var.minio_drives_per_node) : element(["b", "c", "d", "e", "f", "g", "h", "i", "j"], i)]
 
-  # Generate format commands
-  minio_format_cmds = join("\n", [
-    for letter in local.drive_letters : "      - mkfs.xfs -f /dev/sd${letter}"
-  ])
-
-  # Generate mkdir command
-  minio_mkdir_cmd = "      - mkdir -p ${join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])}"
-
-  # Generate mount commands
-  minio_mount_cmds = join("\n", [
-    for i in range(var.minio_drives_per_node) : "      - mount /dev/sd${local.drive_letters[i]} /data${i + 1}"
-  ])
-
-  # Generate fstab entries
-  minio_fstab_cmds = join("\n", [
-    for i in range(var.minio_drives_per_node) : "      - echo '/dev/sd${local.drive_letters[i]} /data${i + 1} xfs defaults,noatime 0 2' >> /etc/fstab"
-  ])
-
-  # Generate chown commands
-  minio_chown_dirs = join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])
+  # Chown directories
+  chown_dirs = join(" ", [for i in range(1, var.minio_drives_per_node + 1) : "/data${i}"])
 
   # MinIO volume spec: http://minio{1...N}:9000/data{1...M}
   minio_volume_spec = "http://minio{1...${var.minio_node_count}}:9000/data{1...${var.minio_drives_per_node}}"
 
-  minio_cloud_init = <<-EOF
-    #cloud-config
-    package_update: true
-
-    packages:
-      - wget
-      - xfsprogs
-
-    runcmd:
-      # Add hostnames for MinIO cluster (required for single erasure set)
-${local.minio_hosts_entries}
-
-      # Format data drives
-${local.minio_format_cmds}
-
-      # Create mount points
-${local.minio_mkdir_cmd}
-
-      # Mount drives
-${local.minio_mount_cmds}
-
-      # Add to fstab
-${local.minio_fstab_cmds}
-
-      # Install MinIO server and client
-      - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
-      - wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
-      - chmod +x /usr/local/bin/minio /usr/local/bin/mc
-
-      # Create minio user
-      - useradd -r -s /sbin/nologin minio-user
-      - chown -R minio-user:minio-user ${local.minio_chown_dirs}
-
-      # Create MinIO environment file
-      - |
-        cat > /etc/default/minio << 'ENVFILE'
-        MINIO_ROOT_USER="${var.minio_root_user}"
-        MINIO_ROOT_PASSWORD="${var.minio_root_password}"
-        MINIO_VOLUMES="${local.minio_volume_spec}"
-        MINIO_OPTS="--console-address :9001"
-        ENVFILE
-
-      # Create systemd service
-      - |
-        cat > /etc/systemd/system/minio.service << 'SERVICE'
-        [Unit]
-        Description=MinIO
-        Documentation=https://min.io/docs/minio
-        Wants=network-online.target
-        After=network-online.target
-
-        [Service]
-        User=minio-user
-        Group=minio-user
-        EnvironmentFile=/etc/default/minio
-        ExecStart=/usr/local/bin/minio server $MINIO_VOLUMES $MINIO_OPTS
-        Restart=always
-        RestartSec=5
-        LimitNOFILE=65536
-
-        [Install]
-        WantedBy=multi-user.target
-        SERVICE
-
-      # Start MinIO
-      - systemctl daemon-reload
-      - systemctl enable minio
-      - systemctl start minio
-
-      # Create ready marker
-      - touch /root/minio-ready
-
-    final_message: "MinIO node ready after $UPTIME seconds"
-  EOF
+  minio_cloud_init = templatefile("${path.module}/minio-cloud-init.yaml", {
+    node_count      = var.minio_node_count
+    drives_per_node = var.minio_drives_per_node
+    drive_letters   = local.drive_letters
+    chown_dirs      = local.chown_dirs
+    root_user       = var.minio_root_user
+    root_password   = var.minio_root_password
+    volume_spec     = local.minio_volume_spec
+  })
 }
 
 # MinIO compute instances

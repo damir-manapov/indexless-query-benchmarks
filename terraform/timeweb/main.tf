@@ -62,28 +62,7 @@ resource "twc_server" "benchmark" {
     }
   }
 
-  # Cloud-init script for initial setup
-  cloud_init = <<-EOF
-    #cloud-config
-    package_update: true
-    packages:
-      - docker.io
-      - htop
-      - iotop
-      - mc
-      - git
-      - curl
-      - wget
-      - unzip
-
-    runcmd:
-      - systemctl enable docker
-      - systemctl start docker
-      - usermod -aG docker root
-      - curl -L https://github.com/minio/warp/releases/download/v1.0.8/warp_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin/ warp
-      - chmod +x /usr/local/bin/warp
-      - touch /root/benchmark-ready
-  EOF
+  cloud_init = file("${path.module}/../benchmark-cloud-init.yaml")
 }
 
 # Create firewall for the server

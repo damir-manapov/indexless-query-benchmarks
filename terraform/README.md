@@ -6,18 +6,22 @@ Provision cloud VMs for running MinIO and Trino benchmarks.
 
 ```
 terraform/
-├── selectel/     # Selectel (OpenStack-based)
+├── check.sh                  # Validation script
+├── benchmark-cloud-init.yaml # Shared benchmark VM setup
+├── selectel/                 # Selectel (OpenStack-based)
 │   ├── main.tf
 │   ├── minio.tf
 │   ├── outputs.tf
 │   ├── variables.tf
-│   └── terraform.tfvars
-└── timeweb/      # Timeweb Cloud
+│   ├── minio-cloud-init.yaml
+│   └── terraform.tfvars.example
+└── timeweb/                  # Timeweb Cloud
     ├── main.tf
     ├── minio.tf
     ├── outputs.tf
     ├── variables.tf
-    └── terraform.tfvars
+    ├── minio-cloud-init.yaml
+    └── terraform.tfvars.example
 ```
 
 ## Prerequisites
@@ -33,7 +37,7 @@ terraform/
 
 ```bash
 cd terraform/selectel
-cp ../terraform.tfvars.example terraform.tfvars
+cp terraform.tfvars.example terraform.tfvars
 ```
 
 Edit `terraform.tfvars` with your credentials:
@@ -48,7 +52,11 @@ Edit `terraform.tfvars` with your credentials:
 
 ```bash
 cd terraform/timeweb
-# Edit terraform.tfvars with your Timeweb API token
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your settings
+
+# Set API token via environment variable
+export TWC_TOKEN="your-api-token"
 ```
 
 ## Usage
