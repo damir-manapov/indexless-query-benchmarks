@@ -211,7 +211,7 @@ def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
 
 
 def wait_for_minio_ready(
-    vm_ip: str, minio_ip: str = "10.0.0.10", timeout: int = 180
+    vm_ip: str, minio_ip: str = "10.0.0.10", timeout: int = 300
 ) -> bool:
     """Wait for MinIO to be ready (cloud-init complete and service responding).
 
@@ -220,24 +220,40 @@ def wait_for_minio_ready(
     print(f"  Waiting for MinIO at {minio_ip} to be ready...")
 
     start = time.time()
+    ssh_ready = False
+
     while time.time() - start < timeout:
+        elapsed = time.time() - start
         try:
-            # Check if cloud-init is complete
+            if not ssh_ready:
+                # First, just check if SSH is reachable
+                ssh_cmd = (
+                    f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{minio_ip} "
+                    f"'echo ok'"
+                )
+                code, _ = run_ssh_command(vm_ip, ssh_cmd, timeout=15, forward_agent=True)
+                if code == 0:
+                    print(f"  SSH to MinIO node available ({elapsed:.0f}s)")
+                    ssh_ready = True
+                else:
+                    print(f"  Waiting for SSH ({elapsed:.0f}s)...")
+                    time.sleep(10)
+                    continue
+
+            # Check if cloud-init is complete and MinIO is healthy
             check_cmd = (
-                f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{minio_ip} "
+                f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{minio_ip} "
                 f"'test -f /root/minio-ready && curl -sf http://localhost:9000/minio/health/ready'"
             )
             code, output = run_ssh_command(
                 vm_ip, check_cmd, timeout=20, forward_agent=True
             )
             if code == 0:
-                print("  MinIO is ready!")
+                print(f"  MinIO is ready! ({elapsed:.0f}s)")
                 return True
             else:
-                elapsed = time.time() - start
                 print(f"  MinIO not ready yet ({elapsed:.0f}s)...")
         except Exception as e:
-            elapsed = time.time() - start
             print(f"  MinIO check failed ({elapsed:.0f}s): {e}")
         time.sleep(10)
 
@@ -612,7 +628,7 @@ def run_fio_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> FioResult | Non
     # Run separate jobs for random and sequential tests
     # Use --stonewall to run jobs sequentially (not in parallel)
     fio_cmd = (
-        f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
+        f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{minio_ip} "
         f'"fio --name=random_rw --directory=/data1 --rw=randrw --rwmixread=70 '
         f"--bs=4k --size=256M --numjobs=4 --runtime=20 --time_based --group_reporting "
         f"--stonewall "
@@ -707,7 +723,7 @@ def run_sysbench_baseline(
 
     # CPU benchmark
     cpu_cmd = (
-        f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
+        f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{minio_ip} "
         f'"sysbench cpu --time=10 run 2>/dev/null" 2>/dev/null'
     )
     try:
@@ -722,7 +738,7 @@ def run_sysbench_baseline(
 
     # Memory benchmark
     mem_cmd = (
-        f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
+        f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{minio_ip} "
         f'"sysbench memory --memory-block-size=1M --memory-total-size=10G run 2>/dev/null" 2>/dev/null'
     )
     try:
