@@ -1,4 +1,4 @@
-output "vm_ip" {
+output "benchmark_vm_ip" {
   description = "Public IP address of the benchmark VM"
   value       = openstack_networking_floatingip_v2.benchmark.address
 }

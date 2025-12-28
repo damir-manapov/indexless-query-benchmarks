@@ -3,13 +3,13 @@ output "project_id" {
   value       = twc_project.benchmark.id
 }
 
-output "vm_ip" {
-  description = "Public IP address of the VM"
+output "benchmark_vm_ip" {
+  description = "Public IP address of the benchmark VM"
   value       = twc_server_ip.benchmark_ipv4.ip
 }
 
 output "ssh_command" {
-  description = "SSH command to connect to the VM"
+  description = "SSH command to connect to the benchmark VM"
   value       = "ssh root@${twc_server_ip.benchmark_ipv4.ip}"
 }
 

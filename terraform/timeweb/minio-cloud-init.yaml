@@ -14,32 +14,41 @@ runcmd:
   - echo '10.0.0.${10 + i} minio${i + 1}' >> /etc/hosts
 %{ endfor ~}
 
-  # Format data drives
-%{ for i in range(drives_per_node) ~}
-  - mkfs.xfs -f /dev/vd${drive_letters[i]}
-%{ endfor ~}
-
-  # Create mount points
-  - mkdir -p%{ for i in range(1, drives_per_node + 1) } /data${i}%{ endfor }
-
-  # Mount drives
-%{ for i in range(drives_per_node) ~}
-  - mount /dev/vd${drive_letters[i]} /data${i + 1}
-%{ endfor ~}
-
-  # Add to fstab
-%{ for i in range(drives_per_node) ~}
-  - echo '/dev/vd${drive_letters[i]} /data${i + 1} xfs defaults,noatime 0 2' >> /etc/fstab
-%{ endfor ~}
+  # Dynamically find and format data drives (non-boot disks > 50GB)
+  # This handles both vd* and sd* naming schemes
+  - |
+    DRIVE_NUM=1
+    for DISK in $(lsblk -dno NAME,SIZE,TYPE | awk '$3=="disk" && $1!~/^loop/ {print $1}'); do
+      # Skip the boot disk (has partitions with / mount)
+      if lsblk /dev/$DISK -o MOUNTPOINT | grep -q "^/$"; then
+        continue
+      fi
+      # Skip small disks (boot disk is usually ~50GB)
+      SIZE_GB=$(lsblk -dno SIZE /dev/$DISK | sed 's/G//')
+      if [ "$SIZE_GB" -lt 60 ] 2>/dev/null; then
+        continue
+      fi
+      # Format and mount this disk
+      mkdir -p /data$DRIVE_NUM
+      mkfs.xfs -f /dev/$DISK
+      mount /dev/$DISK /data$DRIVE_NUM
+      echo "/dev/$DISK /data$DRIVE_NUM xfs defaults,noatime 0 2" >> /etc/fstab
+      echo "Mounted /dev/$DISK as /data$DRIVE_NUM"
+      DRIVE_NUM=$((DRIVE_NUM + 1))
+      # Stop after expected number of drives
+      if [ $DRIVE_NUM -gt ${drives_per_node} ]; then
+        break
+      fi
+    done
 
   # Install MinIO server and client
   - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
   - wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc
   - chmod +x /usr/local/bin/minio /usr/local/bin/mc
 
-  # Create minio user
+  # Create minio user and set ownership
   - useradd -r -s /sbin/nologin minio-user
-  - chown -R minio-user:minio-user%{ for i in range(1, drives_per_node + 1) } /data${i}%{ endfor }
+  - chown -R minio-user:minio-user /data*
 
   # Create MinIO environment file
   - |

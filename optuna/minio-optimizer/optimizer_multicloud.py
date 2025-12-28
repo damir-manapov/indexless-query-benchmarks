@@ -144,7 +144,10 @@ def get_tf_output(tf: Terraform, name: str) -> str | None:
             return None
         # Output is JSON-formatted, strip quotes and newlines
         value = out.strip().strip('"')
-        return value if value else None
+        # Check if it's a valid value (not a warning message or null)
+        if not value or value == "null" or value.startswith("╷") or "Warning" in value:
+            return None
+        return value
     except Exception:
         return None
 
@@ -156,7 +159,7 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     tf = get_terraform(cloud_config)
     
     # Check if VM already exists
-    vm_ip = get_tf_output(tf, "vm_ip")
+    vm_ip = get_tf_output(tf, "benchmark_vm_ip")
     if vm_ip:
         print(f"  Benchmark VM already exists: {vm_ip}")
         return vm_ip
@@ -169,7 +172,7 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
         raise RuntimeError(f"Failed to create benchmark VM: {stderr}")
     
     # Get IP
-    vm_ip = get_tf_output(tf, "vm_ip")
+    vm_ip = get_tf_output(tf, "benchmark_vm_ip")
     if not vm_ip:
         raise RuntimeError("Benchmark VM created but no IP returned")
     
