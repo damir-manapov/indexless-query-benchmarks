@@ -52,15 +52,15 @@ variable "availability_zone" {
 
 # VM Configuration
 variable "cpu_count" {
-  description = "Number of vCPUs"
+  description = "Number of vCPUs for benchmark VM"
   type        = number
-  default     = 8
+  default     = 16
 }
 
 variable "ram_gb" {
-  description = "RAM in GB"
+  description = "RAM in GB for benchmark VM"
   type        = number
-  default     = 8
+  default     = 16
 }
 
 variable "disk_size_gb" {
