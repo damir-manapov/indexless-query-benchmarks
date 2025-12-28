@@ -517,14 +517,22 @@ def destroy_minio(cloud_config: CloudConfig) -> tuple[bool, float]:
 
 def destroy_all(cloud_config: CloudConfig) -> bool:
     """Destroy all infrastructure."""
+    import subprocess
+
     print(f"\nDestroying all resources on {cloud_config.name}...")
 
-    tf = get_terraform(cloud_config)
+    tf_dir = str(cloud_config.terraform_dir)
 
-    # Use auto_approve for destroy (force is deprecated)
-    ret_code, stdout, stderr = tf.destroy(auto_approve=True)
+    # Run terraform destroy directly (python_terraform uses deprecated -force flag)
+    result = subprocess.run(
+        ["terraform", "destroy", "-auto-approve"],
+        cwd=tf_dir,
+        capture_output=True,
+        text=True,
+    )
 
-    if ret_code != 0:
+    if result.returncode != 0:
+        stderr = result.stderr
         # Handle stale state - resources may already be gone
         if is_stale_state_error(stderr):
             print("  Resources already deleted, clearing stale state...")
