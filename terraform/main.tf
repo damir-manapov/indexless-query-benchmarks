@@ -25,6 +25,11 @@ provider "selectel" {
 # Create a project for the benchmark VM
 resource "selectel_vpc_project_v2" "benchmark" {
   name = "benchmark-${var.environment_name}"
+  
+  lifecycle {
+    create_before_destroy = true
+    ignore_changes = [name]  # Allow reuse even if name differs
+  }
 }
 
 # Create a user for OpenStack access
@@ -68,8 +73,9 @@ data "openstack_images_image_v2" "ubuntu" {
 
 # Create a custom flavor for the VM
 # Per Selectel docs: for arbitrary configs, create a flavor via openstack_compute_flavor_v2
+# Note: Flavors persist in OpenStack even after project is deleted, so we use stable naming
 resource "openstack_compute_flavor_v2" "benchmark" {
-  name      = "benchmark-${var.cpu_count}vcpu-${var.ram_gb}gb"
+  name      = "optuna-benchmark-${var.cpu_count}vcpu-${var.ram_gb}gb"
   vcpus     = var.cpu_count
   ram       = var.ram_gb * 1024
   disk      = 0 # Using network boot disk
@@ -77,6 +83,7 @@ resource "openstack_compute_flavor_v2" "benchmark" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [name]  # Allow reuse of existing flavors
   }
 
   depends_on = [
@@ -180,6 +187,10 @@ locals {
     runcmd:
       # Docker
       - curl -fsSL https://get.docker.com | sh
+
+      # Install warp (MinIO benchmark tool)
+      - curl -L https://github.com/minio/warp/releases/download/v1.0.8/warp_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin/ warp
+      - chmod +x /usr/local/bin/warp
 
       # Node.js via NodeSource (more reliable than NVM in cloud-init)
       - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -

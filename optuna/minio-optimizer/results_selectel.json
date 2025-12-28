@@ -1,0 +1,44 @@
+[
+  {
+    "trial": 0,
+    "timestamp": "2025-12-28T09:32:28.859435",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "fast"
+    },
+    "total_drives": 2,
+    "cost_per_hour": 6.8,
+    "cost_efficiency": 51.627941176470586,
+    "total_mib_s": 351.07,
+    "get_mib_s": 302.47,
+    "put_mib_s": 50.55,
+    "duration_s": 192.79135155677795,
+    "error": null
+  },
+  {
+    "trial": 1,
+    "timestamp": "2025-12-28T09:38:44.666261",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "total_drives": 4,
+    "cost_per_hour": 7.2,
+    "cost_efficiency": 57.15416666666666,
+    "total_mib_s": 411.51,
+    "get_mib_s": 354.88,
+    "put_mib_s": 60.59,
+    "duration_s": 114.61129903793335,
+    "error": null
+  }
+]

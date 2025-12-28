@@ -66,6 +66,10 @@ resource "openstack_compute_flavor_v2" "minio" {
   disk      = 0
   is_public = false
 
+  lifecycle {
+    ignore_changes = [name]  # Allow reuse of existing flavors
+  }
+
   depends_on = [
     selectel_vpc_project_v2.benchmark,
     selectel_iam_serviceuser_v1.benchmark

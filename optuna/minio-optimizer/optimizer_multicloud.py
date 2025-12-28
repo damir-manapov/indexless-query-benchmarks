@@ -135,6 +135,35 @@ def get_terraform(cloud_config: CloudConfig) -> Terraform:
     return tf
 
 
+def clear_terraform_state(cloud_config: CloudConfig) -> None:
+    """Clear Terraform state files to start fresh."""
+    import os
+    tf_dir = cloud_config.terraform_dir
+    for f in ["terraform.tfstate", "terraform.tfstate.backup"]:
+        path = tf_dir / f
+        if path.exists():
+            os.remove(path)
+            print(f"  Removed stale state: {path}")
+
+
+def validate_vm_exists(vm_ip: str) -> bool:
+    """Check if VM is actually reachable (not just in state)."""
+    try:
+        code, _ = run_ssh_command(vm_ip, "echo ok", timeout=10)
+        return code == 0
+    except Exception:
+        return False
+
+
+def terraform_refresh_and_validate(tf: Terraform) -> bool:
+    """Run terraform refresh and check if resources are valid."""
+    ret_code, stdout, stderr = tf.refresh()
+    # Check for "not found" errors indicating stale state
+    if "not found" in stderr.lower() or "404" in stderr:
+        return False
+    return ret_code == 0
+
+
 def get_tf_output(tf: Terraform, name: str) -> str | None:
     """Get terraform output value, handling different return formats."""
     try:
@@ -158,18 +187,41 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     
     tf = get_terraform(cloud_config)
     
-    # Check if VM already exists
+    # Check if VM already exists in state
     vm_ip = get_tf_output(tf, "benchmark_vm_ip")
     if vm_ip:
-        print(f"  Benchmark VM already exists: {vm_ip}")
-        return vm_ip
+        # Validate that the VM is actually reachable
+        print(f"  Found VM IP in state: {vm_ip}")
+        if validate_vm_exists(vm_ip):
+            print(f"  Benchmark VM verified and reachable: {vm_ip}")
+            return vm_ip
+        else:
+            print("  VM in state is not reachable, checking if state is stale...")
+            # Try to refresh and see if resources still exist
+            if not terraform_refresh_and_validate(tf):
+                print("  State is stale (resources deleted), clearing state...")
+                clear_terraform_state(cloud_config)
+                tf = get_terraform(cloud_config)  # Re-init after clearing state
+            else:
+                # Resources exist but VM not reachable yet, wait for it
+                print("  Resources exist, waiting for VM to become ready...")
+                if wait_for_vm_ready(vm_ip, timeout=180):
+                    return vm_ip
     
     # Create VM
     print("  Creating benchmark VM...")
     ret_code, stdout, stderr = tf.apply(skip_plan=True)
     
     if ret_code != 0:
-        raise RuntimeError(f"Failed to create benchmark VM: {stderr}")
+        # Check if it's a stale state error
+        if "not found" in stderr.lower() or "404" in stderr:
+            print("  Stale state detected, clearing and retrying...")
+            clear_terraform_state(cloud_config)
+            tf = get_terraform(cloud_config)
+            ret_code, stdout, stderr = tf.apply(skip_plan=True)
+        
+        if ret_code != 0:
+            raise RuntimeError(f"Failed to create benchmark VM: {stderr}")
     
     # Get IP
     vm_ip = get_tf_output(tf, "benchmark_vm_ip")
@@ -205,8 +257,16 @@ def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
     if ret_code != 0:
-        print(f"  Terraform apply failed: {stderr}")
-        return False
+        # Check for stale state errors and retry
+        if "not found" in stderr.lower() or "404" in stderr:
+            print("  Stale state detected, clearing and retrying...")
+            clear_terraform_state(cloud_config)
+            tf = get_terraform(cloud_config)
+            ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
+        
+        if ret_code != 0:
+            print(f"  Terraform apply failed: {stderr}")
+            return False
 
     print("  Waiting for MinIO to initialize (90s)...")
     time.sleep(90)
@@ -223,6 +283,11 @@ def destroy_minio(cloud_config: CloudConfig) -> bool:
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var={"minio_enabled": False})
     
     if ret_code != 0:
+        # Handle stale state gracefully
+        if "not found" in stderr.lower() or "404" in stderr:
+            print("  Stale state detected during MinIO destroy, clearing state...")
+            clear_terraform_state(cloud_config)
+            return True  # State cleared, nothing to destroy
         print(f"  Warning: MinIO destroy may have failed: {stderr}")
         return False
     
@@ -239,6 +304,11 @@ def destroy_all(cloud_config: CloudConfig) -> bool:
     ret_code, stdout, stderr = tf.destroy(auto_approve=True)
     
     if ret_code != 0:
+        # Handle stale state - resources may already be gone
+        if "not found" in stderr.lower() or "404" in stderr:
+            print("  Resources already deleted, clearing stale state...")
+            clear_terraform_state(cloud_config)
+            return True
         print(f"  Warning: Destroy may have failed: {stderr}")
         return False
     
@@ -285,22 +355,35 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult:
         "get_obj_s": 0.0, "put_obj_s": 0.0, "total_obj_s": 0.0,
     }
 
-    output = " ".join(output.split())
+    # Parse new warp output format
+    # Operation: GET, 70%, Concurrency: 20, Ran 29s.
+    #  * Throughput: 305.61 MiB/s, 305.61 obj/s
+    get_pattern = r"Operation:\s*GET.*?Throughput:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
+    put_pattern = r"Operation:\s*PUT.*?Throughput:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
+    total_pattern = r"Cluster Total:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
 
-    patterns = {
-        "get": r"Report:\s*GET.*?Average:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s",
-        "put": r"Report:\s*PUT.*?Average:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s",
-        "total": r"Report:\s*Total.*?Average:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s",
-    }
+    get_match = re.search(get_pattern, output, re.DOTALL | re.IGNORECASE)
+    if get_match:
+        result["get_mib_s"] = float(get_match.group(1))
+        result["get_obj_s"] = float(get_match.group(2))
 
-    for key, pattern in patterns.items():
-        match = re.search(pattern, output, re.DOTALL | re.IGNORECASE)
-        if match:
-            result[f"{key}_mib_s"] = float(match.group(1))
-            result[f"{key}_obj_s"] = float(match.group(2))
+    put_match = re.search(put_pattern, output, re.DOTALL | re.IGNORECASE)
+    if put_match:
+        result["put_mib_s"] = float(put_match.group(1))
+        result["put_obj_s"] = float(put_match.group(2))
+
+    total_match = re.search(total_pattern, output, re.DOTALL | re.IGNORECASE)
+    if total_match:
+        result["total_mib_s"] = float(total_match.group(1))
+        result["total_obj_s"] = float(total_match.group(2))
+
+    # Fallback: calculate total from GET + PUT if Cluster Total not found
+    if result["total_mib_s"] == 0 and (result["get_mib_s"] > 0 or result["put_mib_s"] > 0):
+        result["total_mib_s"] = result["get_mib_s"] + result["put_mib_s"]
+        result["total_obj_s"] = result["get_obj_s"] + result["put_obj_s"]
 
     if result["total_mib_s"] == 0:
-        print(f"  Warning: Could not parse warp output. Sample: {output[:300]}...")
+        print(f"  Warning: Could not parse warp output. Sample: {output[:500]}...")
 
     return BenchmarkResult(
         config={},
@@ -391,6 +474,12 @@ def objective(
     if cached:
         print(f"  Using cached result: {cached['total_mib_s']:.1f} MiB/s")
         return cached["total_mib_s"]
+
+    # Destroy any existing MinIO before deploying new config
+    # (volumes can't be shrunk, so we must recreate)
+    print("  Cleaning up previous MinIO deployment...")
+    destroy_minio(cloud_config)
+    time.sleep(10)  # Wait for resources to be fully released
 
     # Deploy MinIO
     if not deploy_minio(config, cloud_config):
