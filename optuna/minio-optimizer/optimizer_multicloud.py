@@ -210,6 +210,18 @@ def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
     return False
 
 
+def clear_known_hosts_on_vm(vm_ip: str) -> None:
+    """Clear known_hosts on benchmark VM to avoid stale host key errors.
+
+    When VMs are recreated, their host keys change. This causes SSH to reject
+    connections due to 'host key has changed' warnings.
+    """
+    try:
+        run_ssh_command(vm_ip, "rm -f /root/.ssh/known_hosts", timeout=10)
+    except Exception:
+        pass  # Ignore errors, file may not exist
+
+
 def wait_for_minio_ready(
     vm_ip: str, minio_ip: str = "10.0.0.10", timeout: int = 300
 ) -> bool:
@@ -217,6 +229,9 @@ def wait_for_minio_ready(
 
     Uses SSH agent forwarding to check MinIO node via benchmark VM.
     """
+    # Clear stale known_hosts to avoid host key change errors
+    clear_known_hosts_on_vm(vm_ip)
+
     print(f"  Waiting for MinIO at {minio_ip} to be ready...")
 
     start = time.time()
