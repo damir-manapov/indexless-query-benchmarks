@@ -246,7 +246,9 @@ def wait_for_minio_ready(
                     f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{minio_ip} "
                     f"'echo ok'"
                 )
-                code, _ = run_ssh_command(vm_ip, ssh_cmd, timeout=15, forward_agent=True)
+                code, _ = run_ssh_command(
+                    vm_ip, ssh_cmd, timeout=15, forward_agent=True
+                )
                 if code == 0:
                     print(f"  SSH to MinIO node available ({elapsed:.0f}s)")
                     ssh_ready = True

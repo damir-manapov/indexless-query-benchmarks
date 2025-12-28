@@ -160,7 +160,7 @@ resource "openstack_compute_instance_v2" "redis" {
   flavor_id         = openstack_compute_flavor_v2.redis[0].id
   key_pair          = selectel_vpc_keypair_v2.benchmark.name
   availability_zone = var.availability_zone
-  user_data = var.redis_mode == "single" ? local.redis_single_cloud_init : local.redis_sentinel_cloud_init[count.index]
+  user_data         = var.redis_mode == "single" ? local.redis_single_cloud_init : local.redis_sentinel_cloud_init[count.index]
 
   network {
     port = openstack_networking_port_v2.redis[count.index].id
