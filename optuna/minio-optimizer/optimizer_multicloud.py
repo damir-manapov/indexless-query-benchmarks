@@ -156,20 +156,32 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     return None
 
 
-def run_ssh_command(vm_ip: str, command: str, timeout: int = 300) -> tuple[int, str]:
-    """Run command on remote VM via SSH."""
+def run_ssh_command(
+    vm_ip: str, command: str, timeout: int = 300, forward_agent: bool = False
+) -> tuple[int, str]:
+    """Run command on remote VM via SSH.
+
+    Args:
+        vm_ip: IP address of VM to connect to
+        command: Command to run on VM
+        timeout: Command timeout in seconds
+        forward_agent: If True, forward SSH agent for nested SSH connections
+    """
     import subprocess
 
+    ssh_args = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "ConnectTimeout=10",
+    ]
+    if forward_agent:
+        ssh_args.append("-A")
+    ssh_args.extend([f"root@{vm_ip}", command])
+
     result = subprocess.run(
-        [
-            "ssh",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "ConnectTimeout=10",
-            f"root@{vm_ip}",
-            command,
-        ],
+        ssh_args,
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -547,6 +559,7 @@ def run_fio_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> FioResult | Non
     """Run fio on MinIO node to get disk baseline performance.
 
     Runs random 4K and sequential 1M tests on /data1 (MinIO data drive).
+    Uses SSH agent forwarding to authenticate to MinIO node via benchmark VM.
     """
     print("  Running fio disk baseline...")
 
@@ -563,7 +576,7 @@ def run_fio_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> FioResult | Non
     )
 
     try:
-        code, output = run_ssh_command(vm_ip, fio_cmd, timeout=120)
+        code, output = run_ssh_command(vm_ip, fio_cmd, timeout=120, forward_agent=True)
         if code != 0:
             print(f"  Fio failed with code {code}")
             return None
@@ -628,7 +641,10 @@ def parse_fio_output(output: str) -> FioResult | None:
 def run_sysbench_baseline(
     vm_ip: str, minio_ip: str = "10.0.0.10"
 ) -> SysbenchResult | None:
-    """Run sysbench on MinIO node to get CPU and memory baseline."""
+    """Run sysbench on MinIO node to get CPU and memory baseline.
+
+    Uses SSH agent forwarding to authenticate to MinIO node via benchmark VM.
+    """
     print("  Running sysbench CPU/memory baseline...")
 
     result = SysbenchResult()
@@ -639,7 +655,7 @@ def run_sysbench_baseline(
         f'"sysbench cpu --time=10 run 2>/dev/null" 2>/dev/null'
     )
     try:
-        code, output = run_ssh_command(vm_ip, cpu_cmd, timeout=30)
+        code, output = run_ssh_command(vm_ip, cpu_cmd, timeout=30, forward_agent=True)
         if code == 0:
             # Parse: events per second: 1234.56
             match = re.search(r"events per second:\s*([\d.]+)", output)
@@ -654,7 +670,7 @@ def run_sysbench_baseline(
         f'"sysbench memory --memory-block-size=1M --memory-total-size=10G run 2>/dev/null" 2>/dev/null'
     )
     try:
-        code, output = run_ssh_command(vm_ip, mem_cmd, timeout=30)
+        code, output = run_ssh_command(vm_ip, mem_cmd, timeout=30, forward_agent=True)
         if code == 0:
             # Parse: 1234.56 MiB/sec
             match = re.search(r"([\d.]+)\s*MiB/sec", output)

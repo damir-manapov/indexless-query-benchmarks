@@ -235,5 +235,40 @@
       "minio_destroy_s": 0.0,
       "trial_total_s": 232.8156177997589
     }
+  },
+  {
+    "trial": 6,
+    "timestamp": "2025-12-28T12:04:39.803928",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "fast"
+    },
+    "total_drives": 2,
+    "cost_per_hour": 6.8,
+    "cost_efficiency": 49.90882352941176,
+    "total_mib_s": 339.38,
+    "get_mib_s": 292.76,
+    "put_mib_s": 48.13,
+    "duration_s": 177.41330814361572,
+    "error": null,
+    "system_baseline": {
+      "fio": null,
+      "sysbench": {
+        "cpu_events_per_sec": 0.0,
+        "mem_mib_per_sec": 0.0
+      }
+    },
+    "timings": {
+      "minio_deploy_s": 163.86975836753845,
+      "baseline_s": 3.7746076583862305,
+      "benchmark_s": 177.41442203521729,
+      "minio_destroy_s": 53.878615379333496,
+      "trial_total_s": 458.5113880634308
+    }
   }
 ]
