@@ -102,6 +102,9 @@ resource "twc_server" "minio" {
     ip = "10.0.0.${10 + count.index}"
   }
 
+  # Ensure SSH key is created before server
+  depends_on = [twc_ssh_key.benchmark]
+
   cloud_init = templatefile("${path.module}/minio-cloud-init.yaml", {
     node_count      = var.minio_node_count
     drives_per_node = var.minio_drives_per_node

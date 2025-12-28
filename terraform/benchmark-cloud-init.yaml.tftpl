@@ -1,0 +1,39 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+  - fio
+  - build-essential
+
+# Add SSH key via cloud-init (workaround for Timeweb SSH key issues)
+ssh_authorized_keys:
+  - ${ssh_public_key}
+
+runcmd:
+  # Docker
+  - curl -fsSL https://get.docker.com | sh
+
+  # Install warp (MinIO benchmark tool)
+  - curl -L https://github.com/minio/warp/releases/download/v1.0.8/warp_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin/ warp
+  - chmod +x /usr/local/bin/warp
+
+  # Node.js via NodeSource (more reliable than NVM in cloud-init)
+  - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+  - apt-get install -y nodejs
+
+  # PNPM via npm (more reliable than install script)
+  - npm install -g pnpm
+
+  # Clone and setup project
+  - cd /root
+  - git clone https://github.com/damir-manapov/indexless-query-benchmarks.git
+  - cd indexless-query-benchmarks
+  - pnpm install
+
+  # Create ready marker
+  - touch /root/benchmark-ready
+
+final_message: "Benchmark VM ready after $UPTIME seconds"

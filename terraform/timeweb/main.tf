@@ -62,7 +62,12 @@ resource "twc_server" "benchmark" {
     }
   }
 
-  cloud_init = file("${path.module}/../benchmark-cloud-init.yaml")
+  cloud_init = templatefile("${path.module}/../benchmark-cloud-init.yaml.tftpl", {
+    ssh_public_key = file(var.ssh_public_key_path)
+  })
+
+  # Ensure SSH key is created before server
+  depends_on = [twc_ssh_key.benchmark]
 }
 
 # Create firewall for the server
