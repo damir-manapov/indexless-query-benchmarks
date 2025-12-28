@@ -58,9 +58,9 @@ variable "cpu_count" {
 }
 
 variable "ram_gb" {
-  description = "RAM in GB for benchmark VM"
+  description = "RAM in GB for benchmark VM (Selectel requires 32GB min for 16 vCPUs)"
   type        = number
-  default     = 16
+  default     = 32
 }
 
 variable "disk_size_gb" {

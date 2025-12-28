@@ -1057,8 +1057,12 @@ Examples:
     existing_trials = len(study.trials)
     if existing_trials > 0:
         print(f"Resuming study with {existing_trials} existing trials")
-        if study.best_trial:
-            print(f"Current best: {study.best_trial.value:.2f} ({args.metric})")
+        try:
+            best = study.best_trial
+            print(f"Current best: {best.value:.2f} ({args.metric})")
+        except ValueError:
+            # No successful trials yet
+            pass
     print()
 
     try:
@@ -1076,14 +1080,17 @@ Examples:
         print(f"OPTIMIZATION COMPLETE ({args.cloud.upper()})")
         print("=" * 60)
 
-        if study.best_trial:
-            print(f"Best trial: {study.best_trial.number}")
-            print(f"Best config: {study.best_trial.params}")
-            print(f"Best {args.metric}: {study.best_trial.value:.2f}")
+        try:
+            best = study.best_trial
+            print(f"Best trial: {best.number}")
+            print(f"Best config: {best.params}")
+            print(f"Best {args.metric}: {best.value:.2f}")
 
             # Calculate cost for best config
-            best_cost = calculate_cost(study.best_trial.params, cloud_config)
+            best_cost = calculate_cost(best.params, cloud_config)
             print(f"Best config cost: {best_cost:.2f}/hr")
+        except ValueError:
+            print("No successful trials completed")
 
     finally:
         # Cleanup

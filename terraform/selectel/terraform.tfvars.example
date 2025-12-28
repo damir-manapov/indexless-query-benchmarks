@@ -17,8 +17,8 @@ availability_zone = "ru-7b"
 ssh_public_key_path = "~/.ssh/id_ed25519.pub"
 
 # VM Configuration
-cpu_count    = 8
-ram_gb       = 8
+cpu_count    = 16
+ram_gb       = 16
 disk_size_gb = 200
 disk_type    = "fast"  # Options: fast, universal, basic, basic_hdd
 
