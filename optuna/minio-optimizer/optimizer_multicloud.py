@@ -294,7 +294,16 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     return vm_ip
 
 
-def deploy_minio(config: dict, cloud_config: CloudConfig) -> tuple[bool, float]:
+def is_ip_conflict_error(stderr: str | None) -> bool:
+    """Check if the error indicates IP address already allocated."""
+    if stderr is None:
+        return False
+    return "IpAddressAlreadyAllocated" in stderr or "already allocated" in stderr.lower()
+
+
+def deploy_minio(
+    config: dict, cloud_config: CloudConfig, max_retries: int = 3
+) -> tuple[bool, float]:
     """Deploy MinIO cluster with given configuration. Returns (success, duration_s)."""
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
     start = time.time()
@@ -312,20 +321,34 @@ def deploy_minio(config: dict, cloud_config: CloudConfig) -> tuple[bool, float]:
         "minio_drive_type": config["drive_type"],
     }
 
-    # Apply with variables
-    ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
+    # Apply with retries for transient errors
+    for attempt in range(max_retries):
+        ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
-    if ret_code != 0:
-        # Check for stale state errors and retry
+        if ret_code == 0:
+            break
+
+        # Check for stale state errors
         if is_stale_state_error(stderr):
             print("  Stale state detected, clearing and retrying...")
             clear_terraform_state(cloud_config)
             tf = get_terraform(cloud_config)
-            ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
+            continue
 
-        if ret_code != 0:
-            print(f"  Terraform apply failed: {stderr}")
-            return False, time.time() - start
+        # Check for IP conflict (OpenStack hasn't released ports yet)
+        if is_ip_conflict_error(stderr):
+            wait_time = 15 * (attempt + 1)  # 15s, 30s, 45s
+            print(f"  IP conflict detected, waiting {wait_time}s for ports to release...")
+            time.sleep(wait_time)
+            continue
+
+        # Unknown error
+        print(f"  Terraform apply failed: {stderr}")
+        return False, time.time() - start
+
+    if ret_code != 0:
+        print(f"  Terraform apply failed after {max_retries} retries: {stderr}")
+        return False, time.time() - start
 
     print("  Waiting for MinIO to initialize (90s)...")
     time.sleep(90)
@@ -746,7 +769,7 @@ def objective(
     # (volumes can't be shrunk, so we must recreate)
     print("  Cleaning up previous MinIO deployment...")
     _, cleanup_time = destroy_minio(cloud_config)
-    time.sleep(10)  # Wait for resources to be fully released
+    time.sleep(15)  # Wait for OpenStack to release ports/IPs
 
     # Deploy MinIO
     success, deploy_time = deploy_minio(config, cloud_config)
