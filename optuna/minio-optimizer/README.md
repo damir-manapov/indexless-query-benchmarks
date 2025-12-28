@@ -23,10 +23,10 @@ The optimizer is fully self-sufficient and handles:
 
 ## Supported Clouds
 
-| Cloud    | Terraform Dir        | Disk Types             |
-| -------- | -------------------- | ---------------------- |
-| Selectel | `terraform/`         | fast, universal, basic |
-| Timeweb  | `terraform/timeweb/` | nvme                   |
+| Cloud    | Terraform Dir         | Disk Types             |
+| -------- | --------------------- | ---------------------- |
+| Selectel | `terraform/selectel/` | fast, universal, basic |
+| Timeweb  | `terraform/timeweb/`  | nvme                   |
 
 ## Setup
 
@@ -52,10 +52,10 @@ uv run python optimizer_multicloud.py --cloud selectel --trials 20
 
 ```bash
 # Clear everything and start fresh
-cd ../../terraform
+cd ../../terraform/selectel
 terraform destroy -auto-approve
 rm -f terraform.tfstate terraform.tfstate.backup
-cd ../optuna/minio-optimizer
+cd ../../optuna/minio-optimizer
 rm -f study.db results_selectel.json
 
 # Run - it will create everything from scratch

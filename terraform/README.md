@@ -1,19 +1,39 @@
 # Terraform for Benchmark VMs
 
-Provision Selectel VMs for running benchmarks with different hardware configurations.
+Provision cloud VMs for running MinIO and Trino benchmarks.
+
+## Structure
+
+```
+terraform/
+├── selectel/     # Selectel (OpenStack-based)
+│   ├── main.tf
+│   ├── minio.tf
+│   ├── outputs.tf
+│   ├── variables.tf
+│   └── terraform.tfvars
+└── timeweb/      # Timeweb Cloud
+    ├── main.tf
+    ├── minio.tf
+    ├── outputs.tf
+    ├── variables.tf
+    └── terraform.tfvars
+```
 
 ## Prerequisites
 
 1. [Terraform](https://terraform.io/downloads) >= 1.0
 2. [tflint](https://github.com/terraform-linters/tflint) (optional, for linting)
 3. [trivy](https://github.com/aquasecurity/trivy) (optional, for security scanning)
-4. Selectel account with API access
+4. Cloud account (Selectel or Timeweb)
 
 ## Setup
 
+### Selectel
+
 ```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
+cd terraform/selectel
+cp ../terraform.tfvars.example terraform.tfvars
 ```
 
 Edit `terraform.tfvars` with your credentials:
@@ -24,10 +44,18 @@ Edit `terraform.tfvars` with your credentials:
 - `openstack_password` - Password for the OpenStack service user
 - `ssh_public_key_path` - Path to your SSH public key (default: `~/.ssh/id_ed25519.pub`)
 
+### Timeweb
+
+```bash
+cd terraform/timeweb
+# Edit terraform.tfvars with your Timeweb API token
+```
+
 ## Usage
 
 ```bash
 # Initialize Terraform
+cd terraform/selectel  # or terraform/timeweb
 terraform init
 
 # Preview changes

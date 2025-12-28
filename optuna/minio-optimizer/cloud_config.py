@@ -29,7 +29,7 @@ TERRAFORM_BASE = Path(__file__).parent.parent.parent / "terraform"
 CLOUD_CONFIGS: dict[str, CloudConfig] = {
     "selectel": CloudConfig(
         name="selectel",
-        terraform_dir=TERRAFORM_BASE,
+        terraform_dir=TERRAFORM_BASE / "selectel",
         disk_types=["fast", "universal", "basic"],
         instance_resource="openstack_compute_instance_v2.minio",
         boot_volume_resource="openstack_blockstorage_volume_v3.minio_boot",
