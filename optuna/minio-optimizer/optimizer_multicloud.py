@@ -210,6 +210,41 @@ def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
     return False
 
 
+def wait_for_minio_ready(
+    vm_ip: str, minio_ip: str = "10.0.0.10", timeout: int = 180
+) -> bool:
+    """Wait for MinIO to be ready (cloud-init complete and service responding).
+
+    Uses SSH agent forwarding to check MinIO node via benchmark VM.
+    """
+    print(f"  Waiting for MinIO at {minio_ip} to be ready...")
+
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            # Check if cloud-init is complete
+            check_cmd = (
+                f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{minio_ip} "
+                f"'test -f /root/minio-ready && curl -sf http://localhost:9000/minio/health/ready'"
+            )
+            code, output = run_ssh_command(
+                vm_ip, check_cmd, timeout=20, forward_agent=True
+            )
+            if code == 0:
+                print("  MinIO is ready!")
+                return True
+            else:
+                elapsed = time.time() - start
+                print(f"  MinIO not ready yet ({elapsed:.0f}s)...")
+        except Exception as e:
+            elapsed = time.time() - start
+            print(f"  MinIO check failed ({elapsed:.0f}s): {e}")
+        time.sleep(10)
+
+    print(f"  Warning: MinIO not ready after {timeout}s, continuing anyway...")
+    return False
+
+
 def get_terraform(cloud_config: CloudConfig) -> Terraform:
     """Get Terraform instance, initializing if needed."""
     tf_dir = str(cloud_config.terraform_dir)
@@ -357,9 +392,16 @@ def is_ip_conflict_error(stderr: str | None) -> bool:
 
 
 def deploy_minio(
-    config: dict, cloud_config: CloudConfig, max_retries: int = 3
+    config: dict, cloud_config: CloudConfig, vm_ip: str, max_retries: int = 3
 ) -> tuple[bool, float]:
-    """Deploy MinIO cluster with given configuration. Returns (success, duration_s)."""
+    """Deploy MinIO cluster with given configuration. Returns (success, duration_s).
+
+    Args:
+        config: MinIO configuration dict
+        cloud_config: Cloud provider configuration
+        vm_ip: Benchmark VM IP for SSH connectivity checks
+        max_retries: Number of retries for transient errors
+    """
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
     start = time.time()
 
@@ -409,8 +451,10 @@ def deploy_minio(
         print(f"  Terraform apply failed after {max_retries} retries: {stderr}")
         return False, time.time() - start
 
-    print("  Waiting for MinIO to initialize (90s)...")
-    time.sleep(90)
+    # Wait for MinIO to be ready (cloud-init + service health check)
+    if not wait_for_minio_ready(vm_ip):
+        print("  Warning: MinIO may not be fully ready")
+
     duration = time.time() - start
     print(f"  MinIO deployed in {duration:.1f}s")
     return True, duration
@@ -565,14 +609,19 @@ def run_fio_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> FioResult | Non
 
     # SSH to MinIO node via benchmark VM and run fio
     # Test on /data1 which is the first MinIO data drive
-    # Run both random 4K and sequential 1M tests
+    # Run separate jobs for random and sequential tests
+    # Use --stonewall to run jobs sequentially (not in parallel)
     fio_cmd = (
         f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
-        f'"fio --name=random --directory=/data1 --rw=randrw --rwmixread=70 '
-        f"--bs=4k --size=256M --numjobs=4 --runtime=20 --time_based "
-        f"--name=sequential --directory=/data1 --rw=rw --rwmixread=70 "
-        f"--bs=1M --size=512M --numjobs=1 --runtime=20 --time_based "
-        f'--group_reporting --output-format=json 2>/dev/null" 2>/dev/null'
+        f'"fio --name=random_rw --directory=/data1 --rw=randrw --rwmixread=70 '
+        f"--bs=4k --size=256M --numjobs=4 --runtime=20 --time_based --group_reporting "
+        f"--stonewall "
+        f"--name=seq_read --directory=/data1 --rw=read "
+        f"--bs=1M --size=512M --numjobs=1 --runtime=10 --time_based "
+        f"--stonewall "
+        f"--name=seq_write --directory=/data1 --rw=write "
+        f"--bs=1M --size=512M --numjobs=1 --runtime=10 --time_based "
+        f'--output-format=json 2>/dev/null" 2>/dev/null'
     )
 
     try:
@@ -596,7 +645,12 @@ def parse_fio_output(output: str) -> FioResult | None:
             print("  Warning: No JSON found in fio output")
             return None
 
-        data = json.loads(output[json_start:])
+        try:
+            data = json.loads(output[json_start:])
+        except json.JSONDecodeError as e:
+            print(f"  Warning: Failed to parse fio JSON: {e}")
+            return None
+
         jobs = data.get("jobs", [])
         if not jobs:
             print("  Warning: No jobs in fio output")
@@ -605,11 +659,11 @@ def parse_fio_output(output: str) -> FioResult | None:
         result = FioResult()
 
         for job in jobs:
-            job_name = job.get("jobname", "")
+            job_name = job.get("jobname", "").lower()
             read_stats = job.get("read", {})
             write_stats = job.get("write", {})
 
-            if "random" in job_name.lower():
+            if "random" in job_name:
                 # Random 4K - get IOPS and latency
                 result.rand_read_iops = read_stats.get("iops", 0)
                 result.rand_write_iops = write_stats.get("iops", 0)
@@ -617,11 +671,13 @@ def parse_fio_output(output: str) -> FioResult | None:
                 write_lat_ns = write_stats.get("lat_ns", {}).get("mean", 0)
                 result.rand_read_lat_ms = read_lat_ns / 1_000_000
                 result.rand_write_lat_ms = write_lat_ns / 1_000_000
-            elif "sequential" in job_name.lower():
-                # Sequential 1M - get bandwidth
+            elif "seq_read" in job_name:
+                # Sequential read 1M - get bandwidth
                 read_bw_kib = read_stats.get("bw", 0)
-                write_bw_kib = write_stats.get("bw", 0)
                 result.seq_read_mib_s = read_bw_kib / 1024
+            elif "seq_write" in job_name:
+                # Sequential write 1M - get bandwidth
+                write_bw_kib = write_stats.get("bw", 0)
                 result.seq_write_mib_s = write_bw_kib / 1024
 
         print(
@@ -688,9 +744,12 @@ def run_sysbench_baseline(
 
 
 def run_system_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> SystemBaseline:
-    """Run all system baseline benchmarks."""
-    print("  Running system baseline benchmarks...")
+    """Run all system baseline benchmarks on first MinIO node.
 
+    Args:
+        vm_ip: Benchmark VM IP (jump host)
+        minio_ip: First MinIO node IP for baseline tests
+    """
     fio_result = run_fio_baseline(vm_ip, minio_ip)
     sysbench_result = run_sysbench_baseline(vm_ip, minio_ip)
 
@@ -839,7 +898,7 @@ def objective(
     time.sleep(post_destroy_wait)
 
     # Deploy MinIO
-    success, deploy_time = deploy_minio(config, cloud_config)
+    success, deploy_time = deploy_minio(config, cloud_config, vm_ip)
     timings.minio_deploy_s = deploy_time
     if not success:
         timings.trial_total_s = time.time() - trial_start

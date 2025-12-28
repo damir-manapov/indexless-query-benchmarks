@@ -189,13 +189,13 @@ This helps correlate MinIO throughput with underlying hardware performance.
 
 Each trial records timing for every phase:
 
-| Metric            | Description                              |
-| ----------------- | ---------------------------------------- |
+| Metric            | Description                               |
+| ----------------- | ----------------------------------------- |
 | `minio_deploy_s`  | Terraform create MinIO cluster + 90s wait |
-| `baseline_s`      | fio + sysbench baseline tests            |
-| `benchmark_s`     | warp benchmark execution                 |
-| `minio_destroy_s` | Terraform destroy MinIO                  |
-| `trial_total_s`   | End-to-end trial time                    |
+| `baseline_s`      | fio + sysbench baseline tests             |
+| `benchmark_s`     | warp benchmark execution                  |
+| `minio_destroy_s` | Terraform destroy MinIO                   |
+| `trial_total_s`   | End-to-end trial time                     |
 
 This helps identify bottlenecks and compare provisioning speeds between clouds.
 
