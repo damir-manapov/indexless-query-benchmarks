@@ -14,6 +14,7 @@ terraform/
 │   ├── outputs.tf
 │   ├── variables.tf
 │   ├── minio-cloud-init.yaml
+│   ├── README.md
 │   └── terraform.tfvars.example
 └── timeweb/                  # Timeweb Cloud
     ├── main.tf
@@ -21,6 +22,7 @@ terraform/
     ├── outputs.tf
     ├── variables.tf
     ├── minio-cloud-init.yaml
+    ├── README.md
     └── terraform.tfvars.example
 ```
 
@@ -103,22 +105,22 @@ terraform destroy
 
 ### Example Configurations
 
-**Fast SSD, 96GB RAM:**
+**Default (small test VM):**
 
 ```hcl
-environment_name = "fast-ssd-96gb"
-cpu_count        = 12
-ram_gb           = 96
+environment_name = "test"
+cpu_count        = 8
+ram_gb           = 8
 disk_type        = "fast"
 ```
 
-**Universal SSD, 64GB RAM:**
+**Production benchmark:**
 
 ```hcl
-environment_name = "universal-64gb"
-cpu_count        = 8
+environment_name = "benchmark"
+cpu_count        = 16
 ram_gb           = 64
-disk_type        = "universal"
+disk_type        = "fast"
 ```
 
 ## What Cloud-Init Does
@@ -146,18 +148,18 @@ minio_enabled       = true
 minio_root_password = "your-secure-password"
 
 # Optional overrides
-minio_node_cpu      = 4   # vCPU per node (default: 4)
-minio_node_ram_gb   = 16  # RAM per node (default: 16)
-minio_drive_size_gb = 200 # Per drive (default: 200)
-minio_drives_per_node = 3 # Drives per node (default: 3)
+minio_node_cpu        = 4   # vCPU per node (default: 4)
+minio_node_ram_gb     = 16  # RAM per node (default: 16)
+minio_drives_per_node = 2   # Drives per node (default: 2)
+minio_drive_size_gb   = 100 # Per drive (default: 100)
 ```
 
 ### Architecture
 
-- **2 nodes × 3 drives** = 6 drives total
-- **Single erasure set** across all drives (EC:3)
-- **Usable capacity**: ~50% of raw storage (3 data + 3 parity)
-- **Fault tolerance**: Up to 3 drives OR 1 full node (3 drives)
+- **2 nodes × 2 drives** = 4 drives total (default)
+- **Single erasure set** across all drives (EC:2)
+- **Usable capacity**: ~50% of raw storage (2 data + 2 parity)
+- **Fault tolerance**: Up to 2 drives OR 1 full node
 
 ### Access
 

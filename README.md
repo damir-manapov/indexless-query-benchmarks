@@ -105,12 +105,27 @@ pnpm install
 
 For running benchmarks on cloud VMs with production MinIO cluster, see [terraform/README.md](terraform/README.md).
 
+Two cloud providers are supported:
+
+- **Selectel** - OpenStack-based, see [terraform/selectel/README.md](terraform/selectel/README.md)
+- **Timeweb** - Simple API, see [terraform/timeweb/README.md](terraform/timeweb/README.md)
+
 For automated MinIO configuration optimization using Bayesian search, see [optuna/minio-optimizer/README.md](optuna/minio-optimizer/README.md).
 
 ```bash
-cd terraform
+# Selectel
+cd terraform/selectel
+export TF_VAR_selectel_domain="123456"
+export TF_VAR_selectel_username="your-username"
+export TF_VAR_selectel_password="your-password"
+export TF_VAR_selectel_openstack_password="your-openstack-password"
+
+# Or Timeweb
+cd terraform/timeweb
+export TWC_TOKEN="your-api-token"
+
+# Then
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your Selectel credentials
 terraform init
 terraform apply
 ```

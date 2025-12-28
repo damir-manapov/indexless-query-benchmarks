@@ -93,42 +93,6 @@ resource "twc_firewall_rule" "trino" {
   cidr        = "0.0.0.0/0"
 }
 
-# MinIO API access rule
-resource "twc_firewall_rule" "minio_api" {
-  firewall_id = twc_firewall.benchmark.id
-  direction   = "ingress"
-  port        = 9000
-  protocol    = "tcp"
-  cidr        = "0.0.0.0/0"
-}
-
-# MinIO Console access rule
-resource "twc_firewall_rule" "minio_console" {
-  firewall_id = twc_firewall.benchmark.id
-  direction   = "ingress"
-  port        = 9001
-  protocol    = "tcp"
-  cidr        = "0.0.0.0/0"
-}
-
-# ClickHouse HTTP access rule
-resource "twc_firewall_rule" "clickhouse_http" {
-  firewall_id = twc_firewall.benchmark.id
-  direction   = "ingress"
-  port        = 8123
-  protocol    = "tcp"
-  cidr        = "0.0.0.0/0"
-}
-
-# DuckDB access rule
-resource "twc_firewall_rule" "duckdb" {
-  firewall_id = twc_firewall.benchmark.id
-  direction   = "ingress"
-  port        = 3000
-  protocol    = "tcp"
-  cidr        = "0.0.0.0/0"
-}
-
 # Add IPv4 address to the server
 resource "twc_server_ip" "benchmark_ipv4" {
   source_server_id = twc_server.benchmark.id

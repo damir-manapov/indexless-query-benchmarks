@@ -13,8 +13,8 @@ output "vm_specs" {
   value = {
     cpu       = var.cpu_count
     ram_gb    = var.ram_gb
-    disk_type = var.disk_type
     disk_gb   = var.disk_size_gb
+    disk_type = var.disk_type
     region    = var.region
   }
 }

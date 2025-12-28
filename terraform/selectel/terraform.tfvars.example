@@ -7,15 +7,18 @@
 # Get credentials from: https://my.selectel.ru/profile/apikeys
 
 # Environment name (used in resource naming)
-environment_name = "fast-ssd-96gb"
+environment_name = "optuna"
 
 # Region and availability zone
 region            = "ru-7"
 availability_zone = "ru-7b"
 
+# SSH key path
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+
 # VM Configuration
-cpu_count    = 12
-ram_gb       = 96
+cpu_count    = 8
+ram_gb       = 8
 disk_size_gb = 200
 disk_type    = "fast"  # Options: fast, universal, basic, basic_hdd
 
@@ -26,6 +29,6 @@ disk_type    = "fast"  # Options: fast, universal, basic, basic_hdd
 # minio_node_count      = 2    # Number of nodes (2, 3, 4, 6)
 # minio_node_cpu        = 4    # vCPU per node
 # minio_node_ram_gb     = 16   # RAM per node
-# minio_drives_per_node = 3    # Drives per node (2, 3, 4)
-# minio_drive_size_gb   = 200  # Size per drive
+# minio_drives_per_node = 2    # Drives per node (2, 3, 4)
+# minio_drive_size_gb   = 100  # Size per drive
 # minio_drive_type      = "fast"  # fast or universal

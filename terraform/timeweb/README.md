@@ -66,22 +66,20 @@ terraform destroy
 | --------------------- | ----------------------- | ----------------------------------- |
 | `environment_name`    | `test`                  | Name suffix for resources           |
 | `location`            | `ru-1`                  | Datacenter (ru-1, ru-2, pl-1, kz-1) |
-| `cpu_count`           | `12`                    | Number of vCPUs                     |
-| `ram_gb`              | `96`                    | RAM in GB                           |
+| `cpu_count`           | `8`                     | Number of vCPUs                     |
+| `ram_gb`              | `8`                     | RAM in GB                           |
 | `disk_size_gb`        | `200`                   | Disk size in GB                     |
 | `disk_type`           | `nvme`                  | Disk type (nvme, ssd, hdd)          |
 | `ssh_public_key_path` | `~/.ssh/id_ed25519.pub` | Path to SSH public key              |
 
 ## Firewall Rules
 
-The following ports are opened:
+The following ports are opened on benchmark VM:
 
 - 22 (SSH)
 - 8080 (Trino UI)
-- 9000 (MinIO API)
-- 9001 (MinIO Console)
-- 8123 (ClickHouse HTTP)
-- 3000 (DuckDB)
+
+MinIO cluster (when enabled) has its own firewall with ports 22, 9000, 9001.
 
 ## Cloud-init
 

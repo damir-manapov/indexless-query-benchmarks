@@ -28,13 +28,13 @@ variable "minio_node_ram_gb" {
 variable "minio_drives_per_node" {
   description = "Number of data drives per MinIO node"
   type        = number
-  default     = 3
+  default     = 2
 }
 
 variable "minio_drive_size_gb" {
   description = "Size of each data drive in GB"
   type        = number
-  default     = 200
+  default     = 100
 }
 
 variable "minio_drive_type" {
@@ -236,4 +236,18 @@ output "minio_credentials" {
 output "minio_ssh_tunnel" {
   description = "SSH tunnel command to access MinIO console"
   value       = var.minio_enabled ? "ssh -L 9001:10.0.0.10:9001 -L 9000:10.0.0.10:9000 root@${openstack_networking_floatingip_v2.benchmark.address}" : null
+}
+
+output "minio_cluster_spec" {
+  description = "MinIO cluster specification"
+  value = var.minio_enabled ? {
+    nodes           = var.minio_node_count
+    cpu_per_node    = var.minio_node_cpu
+    ram_per_node_gb = var.minio_node_ram_gb
+    drives_per_node = var.minio_drives_per_node
+    drive_size_gb   = var.minio_drive_size_gb
+    drive_type      = var.minio_drive_type
+    total_drives    = var.minio_node_count * var.minio_drives_per_node
+    total_storage   = var.minio_node_count * var.minio_drives_per_node * var.minio_drive_size_gb
+  } : null
 }
