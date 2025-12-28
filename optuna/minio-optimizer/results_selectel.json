@@ -40,5 +40,49 @@
     "put_mib_s": 60.59,
     "duration_s": 114.61129903793335,
     "error": null
+  },
+  {
+    "trial": 4,
+    "timestamp": "2025-12-28T11:18:49.642552",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 2,
+      "drive_size_gb": 100,
+      "drive_type": "basic"
+    },
+    "total_drives": 8,
+    "cost_per_hour": 22.400000000000002,
+    "cost_efficiency": 0.0,
+    "total_mib_s": 0.0,
+    "get_mib_s": 0.0,
+    "put_mib_s": 0.0,
+    "duration_s": 0.0,
+    "error": "Deploy failed",
+    "system_baseline": null
+  },
+  {
+    "trial": 5,
+    "timestamp": "2025-12-28T11:20:39.913588",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 3,
+      "cpu_per_node": 4,
+      "ram_per_node": 16,
+      "drives_per_node": 3,
+      "drive_size_gb": 200,
+      "drive_type": "universal"
+    },
+    "total_drives": 9,
+    "cost_per_hour": 19.799999999999997,
+    "cost_efficiency": 0.0,
+    "total_mib_s": 0.0,
+    "get_mib_s": 0.0,
+    "put_mib_s": 0.0,
+    "duration_s": 0.0,
+    "error": "Deploy failed",
+    "system_baseline": null
   }
 ]

@@ -149,6 +149,13 @@ Results are saved to `results_{cloud}.json` (e.g., `results_selectel.json`):
         "cpu_events_per_sec": 1250,
         "mem_mib_per_sec": 8500
       }
+    },
+    "timings": {
+      "minio_deploy_s": 145.2,
+      "baseline_s": 32.5,
+      "benchmark_s": 192.8,
+      "minio_destroy_s": 28.3,
+      "trial_total_s": 408.8
     }
   }
 ]
@@ -177,6 +184,20 @@ Before each warp benchmark, system baseline tests run on the MinIO node:
 | `mem_mib_per_sec`    | Memory throughput (MiB/s)          |
 
 This helps correlate MinIO throughput with underlying hardware performance.
+
+### Trial Timings
+
+Each trial records timing for every phase:
+
+| Metric            | Description                              |
+| ----------------- | ---------------------------------------- |
+| `minio_deploy_s`  | Terraform create MinIO cluster + 90s wait |
+| `baseline_s`      | fio + sysbench baseline tests            |
+| `benchmark_s`     | warp benchmark execution                 |
+| `minio_destroy_s` | Terraform destroy MinIO                  |
+| `trial_total_s`   | End-to-end trial time                    |
+
+This helps identify bottlenecks and compare provisioning speeds between clouds.
 
 ## Notes
 

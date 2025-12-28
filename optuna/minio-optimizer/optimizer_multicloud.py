@@ -68,6 +68,17 @@ class SystemBaseline:
 
 
 @dataclass
+class TrialTimings:
+    """Timing measurements for each phase of a trial."""
+
+    minio_deploy_s: float = 0.0  # Terraform create MinIO cluster
+    baseline_s: float = 0.0  # fio + sysbench tests
+    benchmark_s: float = 0.0  # warp benchmark
+    minio_destroy_s: float = 0.0  # Terraform destroy MinIO
+    trial_total_s: float = 0.0  # End-to-end trial time
+
+
+@dataclass
 class BenchmarkResult:
     config: dict
     get_mib_s: float = 0.0
@@ -79,6 +90,7 @@ class BenchmarkResult:
     duration_s: float = 0.0
     error: str | None = None
     baseline: SystemBaseline | None = None
+    timings: TrialTimings | None = None
 
 
 def config_to_key(config: dict) -> str:
@@ -282,9 +294,10 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     return vm_ip
 
 
-def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
-    """Deploy MinIO cluster with given configuration."""
+def deploy_minio(config: dict, cloud_config: CloudConfig) -> tuple[bool, float]:
+    """Deploy MinIO cluster with given configuration. Returns (success, duration_s)."""
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
+    start = time.time()
 
     tf = get_terraform(cloud_config)
 
@@ -312,16 +325,19 @@ def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
 
         if ret_code != 0:
             print(f"  Terraform apply failed: {stderr}")
-            return False
+            return False, time.time() - start
 
     print("  Waiting for MinIO to initialize (90s)...")
     time.sleep(90)
-    return True
+    duration = time.time() - start
+    print(f"  MinIO deployed in {duration:.1f}s")
+    return True, duration
 
 
-def destroy_minio(cloud_config: CloudConfig) -> bool:
-    """Destroy MinIO cluster but keep benchmark VM."""
+def destroy_minio(cloud_config: CloudConfig) -> tuple[bool, float]:
+    """Destroy MinIO cluster but keep benchmark VM. Returns (success, duration_s)."""
     print(f"  Destroying MinIO on {cloud_config.name}...")
+    start = time.time()
 
     tf = get_terraform(cloud_config)
 
@@ -333,11 +349,13 @@ def destroy_minio(cloud_config: CloudConfig) -> bool:
         if is_stale_state_error(stderr):
             print("  Stale state detected during MinIO destroy, clearing state...")
             clear_terraform_state(cloud_config)
-            return True  # State cleared, nothing to destroy
+            return True, time.time() - start  # State cleared, nothing to destroy
         print(f"  Warning: MinIO destroy may have failed: {stderr}")
-        return False
+        return False, time.time() - start
 
-    return True
+    duration = time.time() - start
+    print(f"  MinIO destroyed in {duration:.1f}s")
+    return True, duration
 
 
 def destroy_all(cloud_config: CloudConfig) -> bool:
@@ -648,6 +666,17 @@ def save_result(
             "sysbench": sysbench_metrics,
         }
 
+    # Build timings dict if available
+    timings_metrics = None
+    if result.timings:
+        timings_metrics = {
+            "minio_deploy_s": result.timings.minio_deploy_s,
+            "baseline_s": result.timings.baseline_s,
+            "benchmark_s": result.timings.benchmark_s,
+            "minio_destroy_s": result.timings.minio_destroy_s,
+            "trial_total_s": result.timings.trial_total_s,
+        }
+
     results.append(
         {
             "trial": trial_number,
@@ -663,6 +692,7 @@ def save_result(
             "duration_s": result.duration_s,
             "error": result.error,
             "system_baseline": baseline_metrics,
+            "timings": timings_metrics,
         }
     )
 
@@ -708,16 +738,23 @@ def objective(
         print(f"  Using cached result: {cached['total_mib_s']:.1f} MiB/s")
         return cached["total_mib_s"]
 
+    # Start timing the trial
+    trial_start = time.time()
+    timings = TrialTimings()
+
     # Destroy any existing MinIO before deploying new config
     # (volumes can't be shrunk, so we must recreate)
     print("  Cleaning up previous MinIO deployment...")
-    destroy_minio(cloud_config)
+    _, cleanup_time = destroy_minio(cloud_config)
     time.sleep(10)  # Wait for resources to be fully released
 
     # Deploy MinIO
-    if not deploy_minio(config, cloud_config):
+    success, deploy_time = deploy_minio(config, cloud_config)
+    timings.minio_deploy_s = deploy_time
+    if not success:
+        timings.trial_total_s = time.time() - trial_start
         save_result(
-            BenchmarkResult(config=config, error="Deploy failed"),
+            BenchmarkResult(config=config, error="Deploy failed", timings=timings),
             config,
             trial.number,
             cloud,
@@ -726,13 +763,24 @@ def objective(
         return 0.0
 
     # Run system baseline (fio + sysbench) on MinIO node
+    baseline_start = time.time()
     baseline = run_system_baseline(vm_ip)
+    timings.baseline_s = time.time() - baseline_start
 
     # Run benchmark
+    benchmark_start = time.time()
     result = run_warp_benchmark(vm_ip)
+    timings.benchmark_s = time.time() - benchmark_start
+
     if result is None:
+        timings.trial_total_s = time.time() - trial_start
         save_result(
-            BenchmarkResult(config=config, error="Benchmark failed", baseline=baseline),
+            BenchmarkResult(
+                config=config,
+                error="Benchmark failed",
+                baseline=baseline,
+                timings=timings,
+            ),
             config,
             trial.number,
             cloud,
@@ -740,12 +788,19 @@ def objective(
         )
         return 0.0
 
+    # Destroy MinIO after benchmark to measure destroy time
+    _, destroy_time = destroy_minio(cloud_config)
+    timings.minio_destroy_s = destroy_time
+    timings.trial_total_s = time.time() - trial_start
+
     result.config = config
     result.baseline = baseline
+    result.timings = timings
     save_result(result, config, trial.number, cloud, cloud_config)
 
     cost = calculate_cost(config, cloud_config)
     print(f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr")
+    print(f"  Timings: deploy={timings.minio_deploy_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.minio_destroy_s:.0f}s, total={timings.trial_total_s:.0f}s")
 
     return result.total_mib_s
 
