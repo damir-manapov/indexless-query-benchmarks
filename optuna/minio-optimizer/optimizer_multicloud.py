@@ -253,9 +253,10 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
                 if wait_for_vm_ready(vm_ip, timeout=180):
                     return vm_ip
 
-    # Create VM
+    # Create VM only (explicitly disable MinIO to avoid terraform.tfvars override)
     print("  Creating benchmark VM...")
-    ret_code, stdout, stderr = tf.apply(skip_plan=True)
+    tf_vars = {"minio_enabled": False}
+    ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
     if ret_code != 0:
         # Check if it's a stale state error
@@ -263,7 +264,7 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
             print("  Stale state detected, clearing and retrying...")
             clear_terraform_state(cloud_config)
             tf = get_terraform(cloud_config)
-            ret_code, stdout, stderr = tf.apply(skip_plan=True)
+            ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
         if ret_code != 0:
             raise RuntimeError(f"Failed to create benchmark VM: {stderr}")
