@@ -44,7 +44,7 @@ cp terraform.tfvars.example terraform.tfvars
 export TF_VAR_selectel_domain="123456"
 export TF_VAR_selectel_username="your-username"
 export TF_VAR_selectel_password="your-password"
-export TF_VAR_openstack_password="your-openstack-password"
+export TF_VAR_selectel_openstack_password="your-openstack-password"
 ```
 
 Get credentials from https://my.selectel.ru/profile/apikeys

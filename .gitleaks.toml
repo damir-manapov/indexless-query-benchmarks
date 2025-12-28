@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow placeholder passwords in documentation examples"
+regexes = [
+  '''"your-password"''',
+  '''"your-openstack-password"''',
+  '''"your-api-token"''',
+]

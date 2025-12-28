@@ -35,7 +35,7 @@ resource "selectel_vpc_project_v2" "benchmark" {
 # Create a user for OpenStack access
 resource "selectel_iam_serviceuser_v1" "benchmark" {
   name     = "benchmark-${var.environment_name}"
-  password = var.openstack_password
+  password = var.selectel_openstack_password
   role {
     role_name  = "member"
     scope      = "project"
@@ -56,7 +56,7 @@ provider "openstack" {
   domain_name = var.selectel_domain
   tenant_id   = selectel_vpc_project_v2.benchmark.id
   user_name   = selectel_iam_serviceuser_v1.benchmark.name
-  password    = var.openstack_password
+  password    = var.selectel_openstack_password
   region      = var.region
 }
 

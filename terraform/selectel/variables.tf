@@ -3,7 +3,7 @@
 #   export TF_VAR_selectel_domain="123456"
 #   export TF_VAR_selectel_username="your-username"
 #   export TF_VAR_selectel_password="your-password"
-#   export TF_VAR_openstack_password="your-openstack-password"
+#   export TF_VAR_selectel_openstack_password="your-openstack-password"
 
 variable "selectel_domain" {
   description = "Selectel account domain (account ID)"
@@ -24,7 +24,7 @@ variable "selectel_password" {
   default     = null
 }
 
-variable "openstack_password" {
+variable "selectel_openstack_password" {
   description = "Password for OpenStack service user"
   type        = string
   sensitive   = true
