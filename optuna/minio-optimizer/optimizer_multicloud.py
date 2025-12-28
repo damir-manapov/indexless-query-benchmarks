@@ -118,10 +118,21 @@ def load_results(cloud: str) -> list[dict[str, Any]]:
 
 
 def find_cached_result(config: dict, cloud: str) -> dict | None:
-    """Find a cached result for the given config."""
+    """Find a cached successful result for the given config.
+
+    Returns None if:
+    - No cached result exists
+    - Cached result has error (failed trial)
+    - Cached result has 0 throughput (benchmark failed)
+    """
     target_key = config_to_key(config)
     for result in load_results(cloud):
         if config_to_key(result["config"]) == target_key:
+            # Skip failed results - they should be retried
+            if result.get("error"):
+                return None
+            if result.get("total_mib_s", 0) <= 0:
+                return None
             return result
     return None
 
