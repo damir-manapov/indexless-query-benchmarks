@@ -119,5 +119,92 @@
       "minio_destroy_s": 0.0,
       "trial_total_s": 231.46748089790344
     }
+  },
+  {
+    "trial": 0,
+    "timestamp": "2025-12-28T11:38:22.567821",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "fast"
+    },
+    "total_drives": 2,
+    "cost_per_hour": 6.8,
+    "cost_efficiency": 0.0,
+    "total_mib_s": 0.0,
+    "get_mib_s": 0.0,
+    "put_mib_s": 0.0,
+    "duration_s": 0.0,
+    "error": "Deploy failed",
+    "system_baseline": null,
+    "timings": {
+      "minio_deploy_s": 224.10392832756042,
+      "baseline_s": 0.0,
+      "benchmark_s": 0.0,
+      "minio_destroy_s": 0.0,
+      "trial_total_s": 287.23783802986145
+    }
+  },
+  {
+    "trial": 1,
+    "timestamp": "2025-12-28T11:42:42.899672",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "total_drives": 4,
+    "cost_per_hour": 7.2,
+    "cost_efficiency": 0.0,
+    "total_mib_s": 0.0,
+    "get_mib_s": 0.0,
+    "put_mib_s": 0.0,
+    "duration_s": 0.0,
+    "error": "Deploy failed",
+    "system_baseline": null,
+    "timings": {
+      "minio_deploy_s": 217.0638291835785,
+      "baseline_s": 0.0,
+      "benchmark_s": 0.0,
+      "minio_destroy_s": 0.0,
+      "trial_total_s": 260.288325548172
+    }
+  },
+  {
+    "trial": 2,
+    "timestamp": "2025-12-28T11:46:55.107024",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 4,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 2,
+      "drive_size_gb": 100,
+      "drive_type": "basic"
+    },
+    "total_drives": 8,
+    "cost_per_hour": 22.400000000000002,
+    "cost_efficiency": 0.0,
+    "total_mib_s": 0.0,
+    "get_mib_s": 0.0,
+    "put_mib_s": 0.0,
+    "duration_s": 0.0,
+    "error": "Deploy failed",
+    "system_baseline": null,
+    "timings": {
+      "minio_deploy_s": 197.18384861946106,
+      "baseline_s": 0.0,
+      "benchmark_s": 0.0,
+      "minio_destroy_s": 0.0,
+      "trial_total_s": 252.17486143112183
+    }
   }
 ]

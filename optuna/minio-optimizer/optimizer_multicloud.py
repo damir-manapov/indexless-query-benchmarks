@@ -329,11 +329,14 @@ def is_ip_conflict_error(stderr: str | None) -> bool:
     if stderr is None:
         return False
     stderr_lower = stderr.lower()
+    # Skip flavor conflicts - those are not transient
+    if "flavor" in stderr_lower:
+        return False
     # OpenStack (Selectel) IP conflicts
     if "IpAddressAlreadyAllocated" in stderr or "already allocated" in stderr_lower:
         return True
-    # Timeweb resource conflicts
-    if "conflict" in stderr_lower or "already exists" in stderr_lower:
+    # Timeweb resource conflicts (not flavor-related)
+    if "already exists" in stderr_lower and "ip" in stderr_lower:
         return True
     # Generic transient errors
     if "resource is busy" in stderr_lower or "try again" in stderr_lower:

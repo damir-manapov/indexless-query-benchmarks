@@ -56,18 +56,18 @@ variable "minio_root_password" {
   default     = "minioadmin123"
 }
 
-# MinIO flavor
+# MinIO flavor - include environment name for uniqueness
 resource "openstack_compute_flavor_v2" "minio" {
   count = var.minio_enabled ? 1 : 0
 
-  name      = "minio-${var.minio_node_cpu}vcpu-${var.minio_node_ram_gb}gb"
+  name      = "minio-${var.environment_name}-${var.minio_node_cpu}vcpu-${var.minio_node_ram_gb}gb"
   ram       = var.minio_node_ram_gb * 1024
   vcpus     = var.minio_node_cpu
   disk      = 0
   is_public = false
 
   lifecycle {
-    ignore_changes = [name] # Allow reuse of existing flavors
+    create_before_destroy = true
   }
 
   depends_on = [
