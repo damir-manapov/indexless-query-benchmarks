@@ -295,10 +295,20 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
 
 
 def is_ip_conflict_error(stderr: str | None) -> bool:
-    """Check if the error indicates IP address already allocated."""
+    """Check if the error indicates IP/resource conflict (retryable)."""
     if stderr is None:
         return False
-    return "IpAddressAlreadyAllocated" in stderr or "already allocated" in stderr.lower()
+    stderr_lower = stderr.lower()
+    # OpenStack (Selectel) IP conflicts
+    if "IpAddressAlreadyAllocated" in stderr or "already allocated" in stderr_lower:
+        return True
+    # Timeweb resource conflicts
+    if "conflict" in stderr_lower or "already exists" in stderr_lower:
+        return True
+    # Generic transient errors
+    if "resource is busy" in stderr_lower or "try again" in stderr_lower:
+        return True
+    return False
 
 
 def deploy_minio(
@@ -769,7 +779,9 @@ def objective(
     # (volumes can't be shrunk, so we must recreate)
     print("  Cleaning up previous MinIO deployment...")
     _, cleanup_time = destroy_minio(cloud_config)
-    time.sleep(15)  # Wait for OpenStack to release ports/IPs
+    # OpenStack needs time to release ports/IPs, Timeweb is faster
+    post_destroy_wait = 15 if cloud == "selectel" else 5
+    time.sleep(post_destroy_wait)
 
     # Deploy MinIO
     success, deploy_time = deploy_minio(config, cloud_config)
