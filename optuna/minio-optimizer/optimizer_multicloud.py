@@ -84,12 +84,14 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
 def run_ssh_command(vm_ip: str, command: str, timeout: int = 300) -> tuple[int, str]:
     """Run command on remote VM via SSH."""
     import subprocess
-    
+
     result = subprocess.run(
         [
             "ssh",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "ConnectTimeout=10",
             f"root@{vm_ip}",
             command,
         ],
@@ -103,18 +105,20 @@ def run_ssh_command(vm_ip: str, command: str, timeout: int = 300) -> tuple[int, 
 def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
     """Wait for benchmark VM to be ready (cloud-init complete)."""
     print(f"  Waiting for VM {vm_ip} to be ready...")
-    
+
     start = time.time()
     while time.time() - start < timeout:
         try:
-            code, _ = run_ssh_command(vm_ip, "test -f /root/benchmark-ready", timeout=15)
+            code, _ = run_ssh_command(
+                vm_ip, "test -f /root/benchmark-ready", timeout=15
+            )
             if code == 0:
                 print("  VM is ready!")
                 return True
         except Exception as e:
             print(f"  SSH not ready yet: {e}")
         time.sleep(10)
-    
+
     print(f"  Warning: VM not ready after {timeout}s, continuing anyway...")
     return False
 
@@ -123,7 +127,7 @@ def get_terraform(cloud_config: CloudConfig) -> Terraform:
     """Get Terraform instance, initializing if needed."""
     tf_dir = str(cloud_config.terraform_dir)
     tf = Terraform(working_dir=tf_dir)
-    
+
     # Check if init needed
     terraform_dir = cloud_config.terraform_dir / ".terraform"
     if not terraform_dir.exists():
@@ -131,13 +135,21 @@ def get_terraform(cloud_config: CloudConfig) -> Terraform:
         ret_code, stdout, stderr = tf.init()
         if ret_code != 0:
             raise RuntimeError(f"Terraform init failed: {stderr}")
-    
+
     return tf
+
+
+def is_stale_state_error(stderr: str | None) -> bool:
+    """Check if the error indicates stale terraform state."""
+    if stderr is None:
+        return False
+    return "not found" in stderr.lower() or "404" in stderr
 
 
 def clear_terraform_state(cloud_config: CloudConfig) -> None:
     """Clear Terraform state files to start fresh."""
     import os
+
     tf_dir = cloud_config.terraform_dir
     for f in ["terraform.tfstate", "terraform.tfstate.backup"]:
         path = tf_dir / f
@@ -159,7 +171,7 @@ def terraform_refresh_and_validate(tf: Terraform) -> bool:
     """Run terraform refresh and check if resources are valid."""
     ret_code, stdout, stderr = tf.refresh()
     # Check for "not found" errors indicating stale state
-    if "not found" in stderr.lower() or "404" in stderr:
+    if is_stale_state_error(stderr):
         return False
     return ret_code == 0
 
@@ -184,9 +196,9 @@ def get_tf_output(tf: Terraform, name: str) -> str | None:
 def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     """Ensure benchmark VM exists and return its IP."""
     print(f"\nChecking benchmark VM for {cloud_config.name}...")
-    
+
     tf = get_terraform(cloud_config)
-    
+
     # Check if VM already exists in state
     vm_ip = get_tf_output(tf, "benchmark_vm_ip")
     if vm_ip:
@@ -207,41 +219,41 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
                 print("  Resources exist, waiting for VM to become ready...")
                 if wait_for_vm_ready(vm_ip, timeout=180):
                     return vm_ip
-    
+
     # Create VM
     print("  Creating benchmark VM...")
     ret_code, stdout, stderr = tf.apply(skip_plan=True)
-    
+
     if ret_code != 0:
         # Check if it's a stale state error
-        if "not found" in stderr.lower() or "404" in stderr:
+        if is_stale_state_error(stderr):
             print("  Stale state detected, clearing and retrying...")
             clear_terraform_state(cloud_config)
             tf = get_terraform(cloud_config)
             ret_code, stdout, stderr = tf.apply(skip_plan=True)
-        
+
         if ret_code != 0:
             raise RuntimeError(f"Failed to create benchmark VM: {stderr}")
-    
+
     # Get IP
     vm_ip = get_tf_output(tf, "benchmark_vm_ip")
     if not vm_ip:
         raise RuntimeError("Benchmark VM created but no IP returned")
-    
+
     print(f"  Benchmark VM created: {vm_ip}")
-    
+
     # Wait for VM to be ready
     wait_for_vm_ready(vm_ip)
-    
+
     return vm_ip
 
 
 def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
     """Deploy MinIO cluster with given configuration."""
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
-    
+
     tf = get_terraform(cloud_config)
-    
+
     # Build variables for terraform apply
     tf_vars = {
         "minio_enabled": True,
@@ -252,18 +264,18 @@ def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
         "minio_drive_size_gb": config["drive_size_gb"],
         "minio_drive_type": config["drive_type"],
     }
-    
+
     # Apply with variables
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
     if ret_code != 0:
         # Check for stale state errors and retry
-        if "not found" in stderr.lower() or "404" in stderr:
+        if is_stale_state_error(stderr):
             print("  Stale state detected, clearing and retrying...")
             clear_terraform_state(cloud_config)
             tf = get_terraform(cloud_config)
             ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
-        
+
         if ret_code != 0:
             print(f"  Terraform apply failed: {stderr}")
             return False
@@ -276,47 +288,49 @@ def deploy_minio(config: dict, cloud_config: CloudConfig) -> bool:
 def destroy_minio(cloud_config: CloudConfig) -> bool:
     """Destroy MinIO cluster but keep benchmark VM."""
     print(f"  Destroying MinIO on {cloud_config.name}...")
-    
+
     tf = get_terraform(cloud_config)
-    
+
     # Apply with minio_enabled=false to destroy MinIO but keep VM
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var={"minio_enabled": False})
-    
+
     if ret_code != 0:
         # Handle stale state gracefully
-        if "not found" in stderr.lower() or "404" in stderr:
+        if is_stale_state_error(stderr):
             print("  Stale state detected during MinIO destroy, clearing state...")
             clear_terraform_state(cloud_config)
             return True  # State cleared, nothing to destroy
         print(f"  Warning: MinIO destroy may have failed: {stderr}")
         return False
-    
+
     return True
 
 
 def destroy_all(cloud_config: CloudConfig) -> bool:
     """Destroy all infrastructure."""
     print(f"\nDestroying all resources on {cloud_config.name}...")
-    
+
     tf = get_terraform(cloud_config)
-    
+
     # Use auto_approve for destroy (force is deprecated)
     ret_code, stdout, stderr = tf.destroy(auto_approve=True)
-    
+
     if ret_code != 0:
         # Handle stale state - resources may already be gone
-        if "not found" in stderr.lower() or "404" in stderr:
+        if is_stale_state_error(stderr):
             print("  Resources already deleted, clearing stale state...")
             clear_terraform_state(cloud_config)
             return True
         print(f"  Warning: Destroy may have failed: {stderr}")
         return False
-    
+
     print("  All resources destroyed.")
     return True
 
 
-def run_warp_benchmark(vm_ip: str, minio_ip: str = "10.0.0.10") -> BenchmarkResult | None:
+def run_warp_benchmark(
+    vm_ip: str, minio_ip: str = "10.0.0.10"
+) -> BenchmarkResult | None:
     """Run warp benchmark and parse results."""
     print("  Running warp benchmark...")
 
@@ -338,7 +352,7 @@ def run_warp_benchmark(vm_ip: str, minio_ip: str = "10.0.0.10") -> BenchmarkResu
     except Exception as e:
         print(f"  Warp failed: {e}")
         return None
-    
+
     duration = time.time() - start_time
 
     if code != 0:
@@ -351,15 +365,23 @@ def run_warp_benchmark(vm_ip: str, minio_ip: str = "10.0.0.10") -> BenchmarkResu
 def parse_warp_output(output: str, duration: float) -> BenchmarkResult:
     """Parse warp benchmark output."""
     result = {
-        "get_mib_s": 0.0, "put_mib_s": 0.0, "total_mib_s": 0.0,
-        "get_obj_s": 0.0, "put_obj_s": 0.0, "total_obj_s": 0.0,
+        "get_mib_s": 0.0,
+        "put_mib_s": 0.0,
+        "total_mib_s": 0.0,
+        "get_obj_s": 0.0,
+        "put_obj_s": 0.0,
+        "total_obj_s": 0.0,
     }
 
     # Parse new warp output format
     # Operation: GET, 70%, Concurrency: 20, Ran 29s.
     #  * Throughput: 305.61 MiB/s, 305.61 obj/s
-    get_pattern = r"Operation:\s*GET.*?Throughput:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
-    put_pattern = r"Operation:\s*PUT.*?Throughput:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
+    get_pattern = (
+        r"Operation:\s*GET.*?Throughput:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
+    )
+    put_pattern = (
+        r"Operation:\s*PUT.*?Throughput:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
+    )
     total_pattern = r"Cluster Total:\s*([\d.]+)\s*MiB/s,\s*([\d.]+)\s*obj/s"
 
     get_match = re.search(get_pattern, output, re.DOTALL | re.IGNORECASE)
@@ -378,7 +400,9 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult:
         result["total_obj_s"] = float(total_match.group(2))
 
     # Fallback: calculate total from GET + PUT if Cluster Total not found
-    if result["total_mib_s"] == 0 and (result["get_mib_s"] > 0 or result["put_mib_s"] > 0):
+    if result["total_mib_s"] == 0 and (
+        result["get_mib_s"] > 0 or result["put_mib_s"] > 0
+    ):
         result["total_mib_s"] = result["get_mib_s"] + result["put_mib_s"]
         result["total_obj_s"] = result["get_obj_s"] + result["put_obj_s"]
 
@@ -415,8 +439,8 @@ def calculate_cost(config: dict, cloud_config: CloudConfig) -> float:
 
 
 def save_result(
-    result: BenchmarkResult, 
-    config: dict, 
+    result: BenchmarkResult,
+    config: dict,
     trial_number: int,
     cloud: str,
     cloud_config: CloudConfig,
@@ -428,20 +452,22 @@ def save_result(
     cost = calculate_cost(config, cloud_config)
     cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
 
-    results.append({
-        "trial": trial_number,
-        "timestamp": datetime.now().isoformat(),
-        "cloud": cloud,
-        "config": config,
-        "total_drives": total_drives,
-        "cost_per_hour": cost,
-        "cost_efficiency": cost_efficiency,
-        "total_mib_s": result.total_mib_s,
-        "get_mib_s": result.get_mib_s,
-        "put_mib_s": result.put_mib_s,
-        "duration_s": result.duration_s,
-        "error": result.error,
-    })
+    results.append(
+        {
+            "trial": trial_number,
+            "timestamp": datetime.now().isoformat(),
+            "cloud": cloud,
+            "config": config,
+            "total_drives": total_drives,
+            "cost_per_hour": cost,
+            "cost_efficiency": cost_efficiency,
+            "total_mib_s": result.total_mib_s,
+            "get_mib_s": result.get_mib_s,
+            "put_mib_s": result.put_mib_s,
+            "duration_s": result.duration_s,
+            "error": result.error,
+        }
+    )
 
     with open(results_file(cloud), "w") as f:
         json.dump(results, f, indent=2)
@@ -455,19 +481,29 @@ def objective(
 ) -> float:
     """Optuna objective function."""
     config_space = get_config_space(cloud)
-    
+
     config = {
         "nodes": trial.suggest_categorical("nodes", config_space["nodes"]),
-        "cpu_per_node": trial.suggest_categorical("cpu_per_node", config_space["cpu_per_node"]),
-        "ram_per_node": trial.suggest_categorical("ram_per_node", config_space["ram_per_node"]),
-        "drives_per_node": trial.suggest_categorical("drives_per_node", config_space["drives_per_node"]),
-        "drive_size_gb": trial.suggest_categorical("drive_size_gb", config_space["drive_size_gb"]),
-        "drive_type": trial.suggest_categorical("drive_type", config_space["drive_type"]),
+        "cpu_per_node": trial.suggest_categorical(
+            "cpu_per_node", config_space["cpu_per_node"]
+        ),
+        "ram_per_node": trial.suggest_categorical(
+            "ram_per_node", config_space["ram_per_node"]
+        ),
+        "drives_per_node": trial.suggest_categorical(
+            "drives_per_node", config_space["drives_per_node"]
+        ),
+        "drive_size_gb": trial.suggest_categorical(
+            "drive_size_gb", config_space["drive_size_gb"]
+        ),
+        "drive_type": trial.suggest_categorical(
+            "drive_type", config_space["drive_type"]
+        ),
     }
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [{cloud}]: {config}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Check cache
     cached = find_cached_result(config, cloud)
@@ -485,7 +521,10 @@ def objective(
     if not deploy_minio(config, cloud_config):
         save_result(
             BenchmarkResult(config=config, error="Deploy failed"),
-            config, trial.number, cloud, cloud_config
+            config,
+            trial.number,
+            cloud,
+            cloud_config,
         )
         return 0.0
 
@@ -494,7 +533,10 @@ def objective(
     if result is None:
         save_result(
             BenchmarkResult(config=config, error="Benchmark failed"),
-            config, trial.number, cloud, cloud_config
+            config,
+            trial.number,
+            cloud,
+            cloud_config,
         )
         return 0.0
 
@@ -524,25 +566,25 @@ Examples:
         """,
     )
     parser.add_argument(
-        "--cloud", 
-        choices=["selectel", "timeweb"], 
+        "--cloud",
+        choices=["selectel", "timeweb"],
         required=True,
         help="Cloud provider",
     )
     parser.add_argument(
-        "--trials", 
-        type=int, 
-        default=5, 
+        "--trials",
+        type=int,
+        default=5,
         help="Number of trials (default: 5)",
     )
     parser.add_argument(
-        "--benchmark-vm-ip", 
+        "--benchmark-vm-ip",
         default=None,
         help="Benchmark VM IP (auto-created if not provided)",
     )
     parser.add_argument(
-        "--study-name", 
-        default=None, 
+        "--study-name",
+        default=None,
         help="Optuna study name (default: minio-{cloud})",
     )
     parser.add_argument(
@@ -604,12 +646,12 @@ Examples:
         print("\n" + "=" * 60)
         print(f"OPTIMIZATION COMPLETE ({args.cloud.upper()})")
         print("=" * 60)
-        
+
         if study.best_trial:
             print(f"Best trial: {study.best_trial.number}")
             print(f"Best config: {study.best_trial.params}")
             print(f"Best throughput: {study.best_trial.value:.1f} MiB/s")
-            
+
             # Calculate cost for best config
             best_cost = calculate_cost(study.best_trial.params, cloud_config)
             print(f"Best config cost: {best_cost:.2f}/hr")

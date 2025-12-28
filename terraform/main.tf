@@ -25,10 +25,10 @@ provider "selectel" {
 # Create a project for the benchmark VM
 resource "selectel_vpc_project_v2" "benchmark" {
   name = "benchmark-${var.environment_name}"
-  
+
   lifecycle {
     create_before_destroy = true
-    ignore_changes = [name]  # Allow reuse even if name differs
+    ignore_changes        = [name] # Allow reuse even if name differs
   }
 }
 
@@ -83,7 +83,7 @@ resource "openstack_compute_flavor_v2" "benchmark" {
 
   lifecycle {
     create_before_destroy = true
-    ignore_changes = [name]  # Allow reuse of existing flavors
+    ignore_changes        = [name] # Allow reuse of existing flavors
   }
 
   depends_on = [

@@ -9,3 +9,6 @@ dist/
 # Lock files
 pnpm-lock.yaml
 uv.lock
+
+# Terraform templates (contain HCL syntax that breaks YAML parsing)
+terraform/**/*-cloud-init.yaml

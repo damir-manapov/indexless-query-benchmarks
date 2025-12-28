@@ -23,10 +23,10 @@ The optimizer is fully self-sufficient and handles:
 
 ## Supported Clouds
 
-| Cloud | Terraform Dir | Disk Types |
-|-------|---------------|------------|
-| Selectel | `terraform/` | fast, universal, basic |
-| Timeweb | `terraform/timeweb/` | nvme |
+| Cloud    | Terraform Dir        | Disk Types             |
+| -------- | -------------------- | ---------------------- |
+| Selectel | `terraform/`         | fast, universal, basic |
+| Timeweb  | `terraform/timeweb/` | nvme                   |
 
 ## Setup
 
@@ -103,10 +103,10 @@ MinIO requires at least 4 drives for erasure coding. EC level = total_drives / 2
 
 ## Sample Results (Selectel, Dec 2025)
 
-| Config | Throughput | Cost/hr | Efficiency |
-| ------ | ---------- | ------- | ---------- |
-| 2×2CPU×4GB, 1×200GB fast | 351 MiB/s | $6.80 | 51.6 |
-| 1×4CPU×32GB, 4×100GB universal | 412 MiB/s | $7.20 | 57.2 |
+| Config                         | Throughput | Cost/hr | Efficiency |
+| ------------------------------ | ---------- | ------- | ---------- |
+| 2×2CPU×4GB, 1×200GB fast       | 351 MiB/s  | $6.80   | 51.6       |
+| 1×4CPU×32GB, 4×100GB universal | 412 MiB/s  | $7.20   | 57.2       |
 
 Best found: **1 node, 4 CPU, 32GB RAM, 4×100GB universal** → 412 MiB/s @ $7.20/hr
 

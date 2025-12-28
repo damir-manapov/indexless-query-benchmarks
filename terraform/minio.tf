@@ -67,7 +67,7 @@ resource "openstack_compute_flavor_v2" "minio" {
   is_public = false
 
   lifecycle {
-    ignore_changes = [name]  # Allow reuse of existing flavors
+    ignore_changes = [name] # Allow reuse of existing flavors
   }
 
   depends_on = [

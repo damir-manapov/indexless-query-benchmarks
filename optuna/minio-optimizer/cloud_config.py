@@ -7,7 +7,7 @@ from pathlib import Path
 @dataclass
 class CloudConfig:
     """Configuration for a cloud provider."""
-    
+
     name: str
     terraform_dir: Path
     disk_types: list[str]
@@ -57,14 +57,16 @@ CLOUD_CONFIGS: dict[str, CloudConfig] = {
 def get_cloud_config(cloud: str) -> CloudConfig:
     """Get configuration for a cloud provider."""
     if cloud not in CLOUD_CONFIGS:
-        raise ValueError(f"Unknown cloud: {cloud}. Available: {list(CLOUD_CONFIGS.keys())}")
+        raise ValueError(
+            f"Unknown cloud: {cloud}. Available: {list(CLOUD_CONFIGS.keys())}"
+        )
     return CLOUD_CONFIGS[cloud]
 
 
 def get_config_space(cloud: str) -> dict:
     """Get configuration space for optimization."""
     config = get_cloud_config(cloud)
-    
+
     return {
         "nodes": [1, 2, 3, 4],  # Reduced for cost control
         "cpu_per_node": [2, 4, 8],

@@ -58,7 +58,7 @@ resource "twc_server" "benchmark" {
     for_each = var.minio_enabled ? [1] : []
     content {
       id = twc_vpc.minio[0].id
-      ip = "10.0.0.100"  # Benchmark VM gets .100 in the VPC
+      ip = "10.0.0.100" # Benchmark VM gets .100 in the VPC
     }
   }
 

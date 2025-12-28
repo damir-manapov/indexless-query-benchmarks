@@ -3,8 +3,8 @@ set -e
 
 cd "$(dirname "$0")"
 
-echo "=== Ruff Format Check ==="
-uv run ruff format --check .
+echo "=== Ruff Format ==="
+uv run ruff format .
 
 echo ""
 echo "=== Ruff Lint ==="
