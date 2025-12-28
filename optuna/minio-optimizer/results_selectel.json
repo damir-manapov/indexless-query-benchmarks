@@ -84,5 +84,40 @@
     "duration_s": 0.0,
     "error": "Deploy failed",
     "system_baseline": null
+  },
+  {
+    "trial": 11,
+    "timestamp": "2025-12-28T11:29:31.191870",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 8,
+      "ram_per_node": 8,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "total_drives": 4,
+    "cost_per_hour": 6.8,
+    "cost_efficiency": 0.0,
+    "total_mib_s": 0.0,
+    "get_mib_s": 0.0,
+    "put_mib_s": 0.0,
+    "duration_s": 0.0,
+    "error": "Benchmark failed",
+    "system_baseline": {
+      "fio": null,
+      "sysbench": {
+        "cpu_events_per_sec": 0.0,
+        "mem_mib_per_sec": 0.0
+      }
+    },
+    "timings": {
+      "minio_deploy_s": 165.81642365455627,
+      "baseline_s": 3.7229325771331787,
+      "benchmark_s": 1.1027982234954834,
+      "minio_destroy_s": 0.0,
+      "trial_total_s": 231.46748089790344
+    }
   }
 ]

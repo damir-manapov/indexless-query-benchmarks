@@ -29,6 +29,19 @@ from cloud_config import CloudConfig, get_cloud_config, get_config_space
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
 
+# Available optimization metrics
+METRICS = {
+    "total_mib_s": "Total throughput (MiB/s)",
+    "cost_efficiency": "Throughput per cost (MiB/s per $/hr)",
+    "get_mib_s": "Read throughput (MiB/s)",
+    "put_mib_s": "Write throughput (MiB/s)",
+}
+
+
+def get_metric_value(result: dict, metric: str) -> float:
+    """Extract the optimization metric value from a result."""
+    return result.get(metric, 0)
+
 
 def results_file(cloud: str) -> Path:
     """Get results file path for a cloud."""
@@ -755,6 +768,7 @@ def objective(
     cloud: str,
     cloud_config: CloudConfig,
     vm_ip: str,
+    metric: str = "total_mib_s",
 ) -> float:
     """Optuna objective function."""
     config_space = get_config_space(cloud)
@@ -785,8 +799,9 @@ def objective(
     # Check cache
     cached = find_cached_result(config, cloud)
     if cached:
-        print(f"  Using cached result: {cached['total_mib_s']:.1f} MiB/s")
-        return cached["total_mib_s"]
+        cached_value = get_metric_value(cached, metric)
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
 
     # Start timing the trial
     trial_start = time.time()
@@ -851,10 +866,18 @@ def objective(
     save_result(result, config, trial.number, cloud, cloud_config)
 
     cost = calculate_cost(config, cloud_config)
-    print(f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr")
+    cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
+    result_metrics = {
+        "total_mib_s": result.total_mib_s,
+        "get_mib_s": result.get_mib_s,
+        "put_mib_s": result.put_mib_s,
+        "cost_efficiency": cost_efficiency,
+    }
+    metric_value = get_metric_value(result_metrics, metric)
+    print(f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr, {metric}={metric_value:.2f}")
     print(f"  Timings: deploy={timings.minio_deploy_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.minio_destroy_s:.0f}s, total={timings.trial_total_s:.0f}s")
 
-    return result.total_mib_s
+    return metric_value
 
 
 def main():
@@ -863,14 +886,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run 5 trials on Timeweb (auto-create VM, destroy at end)
-  python optimizer_multicloud.py --cloud timeweb --trials 5
+  # Optimize for throughput (default)
+  python optimizer_multicloud.py --cloud selectel --trials 5
 
-  # Run on Timeweb, keep infrastructure after
+  # Optimize for cost efficiency (throughput per dollar)
+  python optimizer_multicloud.py --cloud selectel --trials 5 --metric cost_efficiency
+
+  # Optimize for read-heavy workloads
+  python optimizer_multicloud.py --cloud timeweb --trials 5 --metric get_mib_s
+
+  # Keep infrastructure after optimization
   python optimizer_multicloud.py --cloud timeweb --trials 5 --no-destroy
-
-  # Use existing VM
-  python optimizer_multicloud.py --cloud timeweb --trials 5 --benchmark-vm-ip 1.2.3.4
         """,
     )
     parser.add_argument(
@@ -878,6 +904,12 @@ Examples:
         choices=["selectel", "timeweb"],
         required=True,
         help="Cloud provider",
+    )
+    parser.add_argument(
+        "--metric",
+        choices=list(METRICS.keys()),
+        default="total_mib_s",
+        help=f"Metric to optimize (default: total_mib_s). Options: {', '.join(METRICS.keys())}",
     )
     parser.add_argument(
         "--trials",
@@ -893,7 +925,7 @@ Examples:
     parser.add_argument(
         "--study-name",
         default=None,
-        help="Optuna study name (default: minio-{cloud})",
+        help="Optuna study name (default: minio-{cloud}-{metric})",
     )
     parser.add_argument(
         "--no-destroy",
@@ -903,11 +935,12 @@ Examples:
     args = parser.parse_args()
 
     cloud_config = get_cloud_config(args.cloud)
-    study_name = args.study_name or f"minio-{args.cloud}"
+    study_name = args.study_name or f"minio-{args.cloud}-{args.metric}"
 
     print("=" * 60)
     print(f"MinIO Optimizer - {args.cloud.upper()}")
     print("=" * 60)
+    print(f"Metric: {args.metric} ({METRICS[args.metric]})")
     print(f"Trials: {args.trials}")
     print(f"Terraform dir: {cloud_config.terraform_dir}")
     print(f"Results file: {results_file(args.cloud)}")
@@ -939,13 +972,13 @@ Examples:
     if existing_trials > 0:
         print(f"Resuming study with {existing_trials} existing trials")
         if study.best_trial:
-            print(f"Current best: {study.best_trial.value:.1f} MiB/s")
+            print(f"Current best: {study.best_trial.value:.2f} ({args.metric})")
     print()
 
     try:
         # Run optimization
         study.optimize(
-            lambda trial: objective(trial, args.cloud, cloud_config, vm_ip),
+            lambda trial: objective(trial, args.cloud, cloud_config, vm_ip, args.metric),
             n_trials=args.trials,
             show_progress_bar=True,
         )
@@ -958,7 +991,7 @@ Examples:
         if study.best_trial:
             print(f"Best trial: {study.best_trial.number}")
             print(f"Best config: {study.best_trial.params}")
-            print(f"Best throughput: {study.best_trial.value:.1f} MiB/s")
+            print(f"Best {args.metric}: {study.best_trial.value:.2f}")
 
             # Calculate cost for best config
             best_cost = calculate_cost(study.best_trial.params, cloud_config)
