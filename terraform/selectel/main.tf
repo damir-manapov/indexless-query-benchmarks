@@ -160,6 +160,14 @@ resource "openstack_networking_secgroup_rule_v2" "trino" {
   security_group_id = openstack_networking_secgroup_v2.benchmark.id
 }
 
+# Allow all traffic within internal subnet (benchmark VM <-> MinIO nodes)
+resource "openstack_networking_secgroup_rule_v2" "internal" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  remote_ip_prefix  = "10.0.0.0/24"
+  security_group_id = openstack_networking_secgroup_v2.benchmark.id
+}
+
 # Note: egress rule is created by default, no need to add it
 
 # Boot volume with selected disk type
