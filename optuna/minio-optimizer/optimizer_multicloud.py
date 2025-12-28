@@ -362,6 +362,8 @@ def deploy_minio(
     }
 
     # Apply with retries for transient errors
+    ret_code = 1
+    stderr = ""
     for attempt in range(max_retries):
         ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
@@ -378,7 +380,9 @@ def deploy_minio(
         # Check for IP conflict (OpenStack hasn't released ports yet)
         if is_ip_conflict_error(stderr):
             wait_time = 15 * (attempt + 1)  # 15s, 30s, 45s
-            print(f"  IP conflict detected, waiting {wait_time}s for ports to release...")
+            print(
+                f"  IP conflict detected, waiting {wait_time}s for ports to release..."
+            )
             time.sleep(wait_time)
             continue
 
@@ -874,8 +878,12 @@ def objective(
         "cost_efficiency": cost_efficiency,
     }
     metric_value = get_metric_value(result_metrics, metric)
-    print(f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr, {metric}={metric_value:.2f}")
-    print(f"  Timings: deploy={timings.minio_deploy_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.minio_destroy_s:.0f}s, total={timings.trial_total_s:.0f}s")
+    print(
+        f"  Result: {result.total_mib_s:.1f} MiB/s, Cost: {cost:.2f}/hr, {metric}={metric_value:.2f}"
+    )
+    print(
+        f"  Timings: deploy={timings.minio_deploy_s:.0f}s, baseline={timings.baseline_s:.0f}s, benchmark={timings.benchmark_s:.0f}s, destroy={timings.minio_destroy_s:.0f}s, total={timings.trial_total_s:.0f}s"
+    )
 
     return metric_value
 
@@ -978,7 +986,9 @@ Examples:
     try:
         # Run optimization
         study.optimize(
-            lambda trial: objective(trial, args.cloud, cloud_config, vm_ip, args.metric),
+            lambda trial: objective(
+                trial, args.cloud, cloud_config, vm_ip, args.metric
+            ),
             n_trials=args.trials,
             show_progress_bar=True,
         )
