@@ -608,13 +608,6 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult:
         result["total_mib_s"] = float(total_match.group(1))
         result["total_obj_s"] = float(total_match.group(2))
 
-    # Fallback: calculate total from GET + PUT if Cluster Total not found
-    if result["total_mib_s"] == 0 and (
-        result["get_mib_s"] > 0 or result["put_mib_s"] > 0
-    ):
-        result["total_mib_s"] = result["get_mib_s"] + result["put_mib_s"]
-        result["total_obj_s"] = result["get_obj_s"] + result["put_obj_s"]
-
     if result["total_mib_s"] == 0:
         print(f"  Warning: Could not parse warp output. Sample: {output[:500]}...")
 

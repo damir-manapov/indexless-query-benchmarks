@@ -1,0 +1,86 @@
+[
+  {
+    "trial": 3,
+    "timestamp": "2025-12-28T15:39:52.775398",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 2,
+      "cpu_per_node": 2,
+      "ram_per_node": 4,
+      "drives_per_node": 1,
+      "drive_size_gb": 200,
+      "drive_type": "fast"
+    },
+    "total_drives": 2,
+    "cost_per_hour": 6.8,
+    "cost_efficiency": 51.63823529411765,
+    "total_mib_s": 351.14,
+    "get_mib_s": 301.12,
+    "put_mib_s": 51.1,
+    "duration_s": 172.09337496757507,
+    "error": null,
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 8283.541602,
+        "rand_write_iops": 3568.550718,
+        "rand_read_lat_ms": 0.39587039243100003,
+        "rand_write_lat_ms": 0.008230984248000001,
+        "seq_read_mib_s": 252.6240234375,
+        "seq_write_mib_s": 353.5849609375
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3545.18,
+        "mem_mib_per_sec": 25421.61
+      }
+    },
+    "timings": {
+      "minio_deploy_s": 150.44362688064575,
+      "baseline_s": 51.464436292648315,
+      "benchmark_s": 172.0939269065857,
+      "minio_destroy_s": 41.55407905578613,
+      "trial_total_s": 488.4049005508423
+    }
+  },
+  {
+    "trial": 4,
+    "timestamp": "2025-12-28T15:46:44.256040",
+    "cloud": "selectel",
+    "config": {
+      "nodes": 1,
+      "cpu_per_node": 4,
+      "ram_per_node": 32,
+      "drives_per_node": 4,
+      "drive_size_gb": 100,
+      "drive_type": "universal"
+    },
+    "total_drives": 4,
+    "cost_per_hour": 7.2,
+    "cost_efficiency": 56.979166666666664,
+    "total_mib_s": 410.25,
+    "get_mib_s": 351.68,
+    "put_mib_s": 60.53,
+    "duration_s": 114.3641586303711,
+    "error": null,
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 7034.79826,
+        "rand_write_iops": 3037.448128,
+        "rand_read_lat_ms": 0.56278455325,
+        "rand_write_lat_ms": 0.009247061973,
+        "seq_read_mib_s": 94.642578125,
+        "seq_write_mib_s": 415.9013671875
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 3589.02,
+        "mem_mib_per_sec": 24110.14
+      }
+    },
+    "timings": {
+      "minio_deploy_s": 136.15485858917236,
+      "baseline_s": 56.9133722782135,
+      "benchmark_s": 114.36425948143005,
+      "minio_destroy_s": 48.53533744812012,
+      "trial_total_s": 411.4223630428314
+    }
+  }
+]
