@@ -124,6 +124,7 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     - No cached result exists
     - Cached result has error (failed trial)
     - Cached result has 0 throughput (benchmark failed)
+    - Cached result is missing required metrics (system_baseline, timings)
     """
     target_key = config_to_key(config)
     for result in load_results(cloud):
@@ -132,6 +133,11 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
             if result.get("error"):
                 return None
             if result.get("total_mib_s", 0) <= 0:
+                return None
+            # Skip results missing required metrics
+            if not result.get("system_baseline"):
+                return None
+            if not result.get("timings"):
                 return None
             return result
     return None
