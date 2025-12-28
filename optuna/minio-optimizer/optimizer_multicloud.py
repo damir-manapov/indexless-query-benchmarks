@@ -36,6 +36,38 @@ def results_file(cloud: str) -> Path:
 
 
 @dataclass
+class FioResult:
+    """FIO benchmark results for disk baseline."""
+
+    # Random 4K I/O
+    rand_read_iops: float = 0.0
+    rand_write_iops: float = 0.0
+    rand_read_lat_ms: float = 0.0
+    rand_write_lat_ms: float = 0.0
+    # Sequential 1M I/O
+    seq_read_mib_s: float = 0.0
+    seq_write_mib_s: float = 0.0
+
+
+@dataclass
+class SysbenchResult:
+    """Sysbench benchmark results for CPU and memory baseline."""
+
+    # CPU benchmark
+    cpu_events_per_sec: float = 0.0
+    # Memory benchmark
+    mem_mib_per_sec: float = 0.0
+
+
+@dataclass
+class SystemBaseline:
+    """Combined system baseline metrics."""
+
+    fio: FioResult | None = None
+    sysbench: SysbenchResult | None = None
+
+
+@dataclass
 class BenchmarkResult:
     config: dict
     get_mib_s: float = 0.0
@@ -46,6 +78,7 @@ class BenchmarkResult:
     total_obj_s: float = 0.0
     duration_s: float = 0.0
     error: str | None = None
+    baseline: SystemBaseline | None = None
 
 
 def config_to_key(config: dict) -> str:
@@ -421,6 +454,144 @@ def parse_warp_output(output: str, duration: float) -> BenchmarkResult:
     )
 
 
+def run_fio_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> FioResult | None:
+    """Run fio on MinIO node to get disk baseline performance.
+
+    Runs random 4K and sequential 1M tests on /data1 (MinIO data drive).
+    """
+    print("  Running fio disk baseline...")
+
+    # SSH to MinIO node via benchmark VM and run fio
+    # Test on /data1 which is the first MinIO data drive
+    # Run both random 4K and sequential 1M tests
+    fio_cmd = (
+        f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
+        f'"fio --name=random --directory=/data1 --rw=randrw --rwmixread=70 '
+        f"--bs=4k --size=256M --numjobs=4 --runtime=20 --time_based "
+        f"--name=sequential --directory=/data1 --rw=rw --rwmixread=70 "
+        f"--bs=1M --size=512M --numjobs=1 --runtime=20 --time_based "
+        f'--group_reporting --output-format=json 2>/dev/null" 2>/dev/null'
+    )
+
+    try:
+        code, output = run_ssh_command(vm_ip, fio_cmd, timeout=120)
+        if code != 0:
+            print(f"  Fio failed with code {code}")
+            return None
+
+        return parse_fio_output(output)
+    except Exception as e:
+        print(f"  Fio failed: {e}")
+        return None
+
+
+def parse_fio_output(output: str) -> FioResult | None:
+    """Parse fio JSON output with random and sequential tests."""
+    try:
+        # Find JSON in output (may have some stderr before it)
+        json_start = output.find("{")
+        if json_start == -1:
+            print("  Warning: No JSON found in fio output")
+            return None
+
+        data = json.loads(output[json_start:])
+        jobs = data.get("jobs", [])
+        if not jobs:
+            print("  Warning: No jobs in fio output")
+            return None
+
+        result = FioResult()
+
+        for job in jobs:
+            job_name = job.get("jobname", "")
+            read_stats = job.get("read", {})
+            write_stats = job.get("write", {})
+
+            if "random" in job_name.lower():
+                # Random 4K - get IOPS and latency
+                result.rand_read_iops = read_stats.get("iops", 0)
+                result.rand_write_iops = write_stats.get("iops", 0)
+                read_lat_ns = read_stats.get("lat_ns", {}).get("mean", 0)
+                write_lat_ns = write_stats.get("lat_ns", {}).get("mean", 0)
+                result.rand_read_lat_ms = read_lat_ns / 1_000_000
+                result.rand_write_lat_ms = write_lat_ns / 1_000_000
+            elif "sequential" in job_name.lower():
+                # Sequential 1M - get bandwidth
+                read_bw_kib = read_stats.get("bw", 0)
+                write_bw_kib = write_stats.get("bw", 0)
+                result.seq_read_mib_s = read_bw_kib / 1024
+                result.seq_write_mib_s = write_bw_kib / 1024
+
+        print(
+            f"  Fio: rand {result.rand_read_iops:.0f}/{result.rand_write_iops:.0f} IOPS, "
+            f"seq {result.seq_read_mib_s:.0f}/{result.seq_write_mib_s:.0f} MiB/s"
+        )
+
+        return result
+    except json.JSONDecodeError as e:
+        print(f"  Warning: Failed to parse fio JSON: {e}")
+        return None
+    except Exception as e:
+        print(f"  Warning: Failed to parse fio output: {e}")
+        return None
+
+
+def run_sysbench_baseline(
+    vm_ip: str, minio_ip: str = "10.0.0.10"
+) -> SysbenchResult | None:
+    """Run sysbench on MinIO node to get CPU and memory baseline."""
+    print("  Running sysbench CPU/memory baseline...")
+
+    result = SysbenchResult()
+
+    # CPU benchmark
+    cpu_cmd = (
+        f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
+        f'"sysbench cpu --time=10 run 2>/dev/null" 2>/dev/null'
+    )
+    try:
+        code, output = run_ssh_command(vm_ip, cpu_cmd, timeout=30)
+        if code == 0:
+            # Parse: events per second: 1234.56
+            match = re.search(r"events per second:\s*([\d.]+)", output)
+            if match:
+                result.cpu_events_per_sec = float(match.group(1))
+    except Exception as e:
+        print(f"  CPU benchmark failed: {e}")
+
+    # Memory benchmark
+    mem_cmd = (
+        f"ssh -o StrictHostKeyChecking=no root@{minio_ip} "
+        f'"sysbench memory --memory-block-size=1M --memory-total-size=10G run 2>/dev/null" 2>/dev/null'
+    )
+    try:
+        code, output = run_ssh_command(vm_ip, mem_cmd, timeout=30)
+        if code == 0:
+            # Parse: 1234.56 MiB/sec
+            match = re.search(r"([\d.]+)\s*MiB/sec", output)
+            if match:
+                result.mem_mib_per_sec = float(match.group(1))
+    except Exception as e:
+        print(f"  Memory benchmark failed: {e}")
+
+    print(
+        f"  Sysbench: CPU {result.cpu_events_per_sec:.0f} events/s, "
+        f"MEM {result.mem_mib_per_sec:.0f} MiB/s"
+    )
+
+    return result
+
+
+def run_system_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> SystemBaseline:
+    """Run all system baseline benchmarks."""
+    print("  Running system baseline benchmarks...")
+
+    fio_result = run_fio_baseline(vm_ip, minio_ip)
+    sysbench_result = run_sysbench_baseline(vm_ip, minio_ip)
+
+    return SystemBaseline(fio=fio_result, sysbench=sysbench_result)
+
+
 def calculate_cost(config: dict, cloud_config: CloudConfig) -> float:
     """Estimate hourly cost for the configuration."""
     nodes = config["nodes"]
@@ -452,6 +623,30 @@ def save_result(
     cost = calculate_cost(config, cloud_config)
     cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
 
+    # Build baseline metrics dict if available
+    baseline_metrics = None
+    if result.baseline:
+        fio_metrics = None
+        if result.baseline.fio:
+            fio_metrics = {
+                "rand_read_iops": result.baseline.fio.rand_read_iops,
+                "rand_write_iops": result.baseline.fio.rand_write_iops,
+                "rand_read_lat_ms": result.baseline.fio.rand_read_lat_ms,
+                "rand_write_lat_ms": result.baseline.fio.rand_write_lat_ms,
+                "seq_read_mib_s": result.baseline.fio.seq_read_mib_s,
+                "seq_write_mib_s": result.baseline.fio.seq_write_mib_s,
+            }
+        sysbench_metrics = None
+        if result.baseline.sysbench:
+            sysbench_metrics = {
+                "cpu_events_per_sec": result.baseline.sysbench.cpu_events_per_sec,
+                "mem_mib_per_sec": result.baseline.sysbench.mem_mib_per_sec,
+            }
+        baseline_metrics = {
+            "fio": fio_metrics,
+            "sysbench": sysbench_metrics,
+        }
+
     results.append(
         {
             "trial": trial_number,
@@ -466,6 +661,7 @@ def save_result(
             "put_mib_s": result.put_mib_s,
             "duration_s": result.duration_s,
             "error": result.error,
+            "system_baseline": baseline_metrics,
         }
     )
 
@@ -528,11 +724,14 @@ def objective(
         )
         return 0.0
 
+    # Run system baseline (fio + sysbench) on MinIO node
+    baseline = run_system_baseline(vm_ip)
+
     # Run benchmark
     result = run_warp_benchmark(vm_ip)
     if result is None:
         save_result(
-            BenchmarkResult(config=config, error="Benchmark failed"),
+            BenchmarkResult(config=config, error="Benchmark failed", baseline=baseline),
             config,
             trial.number,
             cloud,
@@ -541,6 +740,7 @@ def objective(
         return 0.0
 
     result.config = config
+    result.baseline = baseline
     save_result(result, config, trial.number, cloud, cloud_config)
 
     cost = calculate_cost(config, cloud_config)

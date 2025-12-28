@@ -4,6 +4,8 @@ package_update: true
 packages:
   - wget
   - xfsprogs
+  - fio
+  - sysbench
 
 runcmd:
   # Add hostnames for MinIO cluster (required for single erasure set)

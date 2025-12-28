@@ -4,6 +4,8 @@ package_update: true
 packages:
   - wget
   - xfsprogs
+  - fio
+  - sysbench
 
 runcmd:
   # Wait for disks to be attached

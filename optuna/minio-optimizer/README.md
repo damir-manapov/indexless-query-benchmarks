@@ -135,15 +135,53 @@ Results are saved to `results_{cloud}.json` (e.g., `results_selectel.json`):
     "get_mib_s": 302.47,
     "put_mib_s": 50.55,
     "duration_s": 192.79,
-    "error": null
+    "error": null,
+    "system_baseline": {
+      "fio": {
+        "rand_read_iops": 12500,
+        "rand_write_iops": 7500,
+        "rand_read_lat_ms": 0.32,
+        "rand_write_lat_ms": 0.53,
+        "seq_read_mib_s": 450,
+        "seq_write_mib_s": 380
+      },
+      "sysbench": {
+        "cpu_events_per_sec": 1250,
+        "mem_mib_per_sec": 8500
+      }
+    }
   }
 ]
 ```
 
+### System Baseline Metrics
+
+Before each warp benchmark, system baseline tests run on the MinIO node:
+
+#### Disk Performance (fio)
+
+| Metric              | Description                           |
+| ------------------- | ------------------------------------- |
+| `rand_read_iops`    | Random 4K read IOPS                   |
+| `rand_write_iops`   | Random 4K write IOPS                  |
+| `rand_read_lat_ms`  | Random read latency (ms)              |
+| `rand_write_lat_ms` | Random write latency (ms)             |
+| `seq_read_mib_s`    | Sequential 1M read bandwidth (MiB/s)  |
+| `seq_write_mib_s`   | Sequential 1M write bandwidth (MiB/s) |
+
+#### CPU & Memory (sysbench)
+
+| Metric               | Description                        |
+| -------------------- | ---------------------------------- |
+| `cpu_events_per_sec` | CPU prime number events per second |
+| `mem_mib_per_sec`    | Memory throughput (MiB/s)          |
+
+This helps correlate MinIO throughput with underlying hardware performance.
+
 ## Notes
 
-- Each trial takes ~3-5 minutes (deploy + benchmark + destroy)
-- 10 trials ≈ 30-50 minutes
+- Each trial takes ~5-7 minutes (deploy + baseline + warp benchmark + destroy)
+- 10 trials ≈ 50-70 minutes
 - Cost per trial: ~$0.10-0.50 depending on config
 - The optimizer maximizes total throughput (MiB/s)
 - Optuna study persisted in `study.db` (SQLite) for resumption
