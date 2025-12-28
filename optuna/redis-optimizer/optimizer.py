@@ -13,16 +13,28 @@ Usage:
 import argparse
 import json
 import re
-import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import optuna
 from optuna.samplers import TPESampler
-from python_terraform import Terraform
+
+# Add parent dir to path for common imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from common import (
+    clear_known_hosts_on_vm,
+    destroy_all,
+    get_terraform,
+    get_tf_output,
+    load_results,
+    run_ssh_command,
+    save_results,
+    wait_for_vm_ready,
+)
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
 
@@ -84,19 +96,10 @@ def config_to_key(config: dict) -> str:
     )
 
 
-def load_results(cloud: str) -> list[dict[str, Any]]:
-    """Load results from results file."""
-    path = results_file(cloud)
-    if path.exists():
-        with open(path) as f:
-            return json.load(f)
-    return []
-
-
 def find_cached_result(config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
     target_key = config_to_key(config)
-    for result in load_results(cloud):
+    for result in load_results(results_file(cloud)):
         if config_to_key(result["config"]) == target_key:
             if result.get("error"):
                 return None
@@ -104,59 +107,6 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
                 return None
             return result
     return None
-
-
-def run_ssh_command(
-    vm_ip: str, command: str, timeout: int = 300, forward_agent: bool = False
-) -> tuple[int, str]:
-    """Run command on remote VM via SSH."""
-    ssh_args = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "ConnectTimeout=10",
-    ]
-    if forward_agent:
-        ssh_args.append("-A")
-    ssh_args.extend([f"root@{vm_ip}", command])
-
-    result = subprocess.run(
-        ssh_args,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    return result.returncode, result.stdout + result.stderr
-
-
-def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
-    """Wait for benchmark VM to be ready."""
-    print(f"  Waiting for VM {vm_ip} to be ready...")
-
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            code, _ = run_ssh_command(
-                vm_ip, "test -f /root/benchmark-ready", timeout=15
-            )
-            if code == 0:
-                print("  VM is ready!")
-                return True
-        except Exception as e:
-            print(f"  SSH not ready yet: {e}")
-        time.sleep(10)
-
-    print(f"  Warning: VM not ready after {timeout}s, continuing anyway...")
-    return False
-
-
-def clear_known_hosts_on_vm(vm_ip: str) -> None:
-    """Clear known_hosts on benchmark VM."""
-    try:
-        run_ssh_command(vm_ip, "rm -f /root/.ssh/known_hosts", timeout=10)
-    except Exception:
-        pass
 
 
 def wait_for_redis_ready(
@@ -191,40 +141,11 @@ def wait_for_redis_ready(
     return False
 
 
-def get_terraform(cloud_config: CloudConfig) -> Terraform:
-    """Get Terraform instance, initializing if needed."""
-    tf_dir = str(cloud_config.terraform_dir)
-    tf = Terraform(working_dir=tf_dir)
-
-    terraform_dir = cloud_config.terraform_dir / ".terraform"
-    if not terraform_dir.exists():
-        print(f"  Initializing Terraform in {tf_dir}...")
-        ret_code, stdout, stderr = tf.init()
-        if ret_code != 0:
-            raise RuntimeError(f"Terraform init failed: {stderr}")
-
-    return tf
-
-
-def get_tf_output(tf: Terraform, name: str) -> str | None:
-    """Get terraform output value."""
-    try:
-        ret, out, err = tf.output_cmd(name)
-        if ret != 0 or not out:
-            return None
-        value = out.strip().strip('"')
-        if not value or value == "null":
-            return None
-        return value
-    except Exception:
-        return None
-
-
 def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     """Ensure benchmark VM exists and return its IP."""
     print(f"\nChecking benchmark VM for {cloud_config.name}...")
 
-    tf = get_terraform(cloud_config)
+    tf = get_terraform(cloud_config.terraform_dir)
 
     vm_ip = get_tf_output(tf, "benchmark_vm_ip")
     if vm_ip:
@@ -277,7 +198,7 @@ def deploy_redis(
     print(f"  Deploying Redis on {cloud_config.name}: {config}")
     start = time.time()
 
-    tf = get_terraform(cloud_config)
+    tf = get_terraform(cloud_config.terraform_dir)
 
     tf_vars = {
         "redis_enabled": True,
@@ -309,7 +230,7 @@ def destroy_redis(cloud_config: CloudConfig) -> tuple[bool, float]:
     print(f"  Destroying Redis on {cloud_config.name}...")
     start = time.time()
 
-    tf = get_terraform(cloud_config)
+    tf = get_terraform(cloud_config.terraform_dir)
     ret_code, stdout, stderr = tf.apply(
         skip_plan=True, var={"redis_enabled": False, "minio_enabled": False}
     )
@@ -321,26 +242,6 @@ def destroy_redis(cloud_config: CloudConfig) -> tuple[bool, float]:
     duration = time.time() - start
     print(f"  Redis destroyed in {duration:.1f}s")
     return True, duration
-
-
-def destroy_all(cloud_config: CloudConfig) -> bool:
-    """Destroy all infrastructure."""
-    print(f"\nDestroying all resources on {cloud_config.name}...")
-
-    tf_dir = str(cloud_config.terraform_dir)
-    result = subprocess.run(
-        ["terraform", "destroy", "-auto-approve"],
-        cwd=tf_dir,
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        print(f"  Warning: Destroy may have failed: {result.stderr}")
-        return False
-
-    print("  All resources destroyed.")
-    return True
 
 
 def run_memtier_benchmark(
@@ -427,7 +328,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(cloud)
+    results = load_results(results_file(cloud))
 
     cost = calculate_cost(config, cloud_config)
     cost_efficiency = result.ops_per_sec / cost if cost > 0 else 0
@@ -452,8 +353,7 @@ def save_result(
         }
     )
 
-    with open(results_file(cloud), "w") as f:
-        json.dump(results, f, indent=2)
+    save_results(results, results_file(cloud))
 
 
 def get_metric_value(result: dict, metric: str) -> float:
@@ -678,7 +578,7 @@ Examples:
 
     finally:
         if not args.no_destroy:
-            destroy_all(cloud_config)
+            destroy_all(cloud_config.terraform_dir, cloud_config.name)
         else:
             print("\n--no-destroy specified, keeping infrastructure.")
 

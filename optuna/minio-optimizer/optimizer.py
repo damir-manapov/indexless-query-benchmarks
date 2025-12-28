@@ -6,23 +6,39 @@ Supports both Selectel and Timeweb Cloud providers.
 Automatically creates benchmark VM if not provided.
 
 Usage:
-    python optimizer_multicloud.py --cloud timeweb --trials 5
-    python optimizer_multicloud.py --cloud selectel --trials 10 --no-destroy
-    python optimizer_multicloud.py --cloud timeweb --benchmark-vm-ip 1.2.3.4 --trials 10
+    python optimizer.py --cloud timeweb --trials 5
+    python optimizer.py --cloud selectel --trials 10 --no-destroy
+    python optimizer.py --cloud timeweb --benchmark-vm-ip 1.2.3.4 --trials 10
 """
 
 import argparse
 import json
 import re
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import optuna
 from optuna.samplers import TPESampler
-from python_terraform import Terraform
+
+# Add parent dir to path for common imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from common import (
+    clear_known_hosts_on_vm,
+    clear_terraform_state,
+    destroy_all,
+    get_terraform,
+    get_tf_output,
+    is_stale_state_error,
+    load_results,
+    run_ssh_command,
+    save_results,
+    validate_vm_exists,
+    wait_for_vm_ready,
+)
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
 
@@ -121,15 +137,6 @@ def config_to_key(config: dict) -> str:
     )
 
 
-def load_results(cloud: str) -> list[dict[str, Any]]:
-    """Load results from results file."""
-    path = results_file(cloud)
-    if path.exists():
-        with open(path) as f:
-            return json.load(f)
-    return []
-
-
 def find_cached_result(config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config.
 
@@ -140,7 +147,7 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     - Cached result is missing required metrics (system_baseline, timings)
     """
     target_key = config_to_key(config)
-    for result in load_results(cloud):
+    for result in load_results(results_file(cloud)):
         if config_to_key(result["config"]) == target_key:
             # Skip failed results - they should be retried
             if result.get("error"):
@@ -154,72 +161,6 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
                 return None
             return result
     return None
-
-
-def run_ssh_command(
-    vm_ip: str, command: str, timeout: int = 300, forward_agent: bool = False
-) -> tuple[int, str]:
-    """Run command on remote VM via SSH.
-
-    Args:
-        vm_ip: IP address of VM to connect to
-        command: Command to run on VM
-        timeout: Command timeout in seconds
-        forward_agent: If True, forward SSH agent for nested SSH connections
-    """
-    import subprocess
-
-    ssh_args = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "ConnectTimeout=10",
-    ]
-    if forward_agent:
-        ssh_args.append("-A")
-    ssh_args.extend([f"root@{vm_ip}", command])
-
-    result = subprocess.run(
-        ssh_args,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    return result.returncode, result.stdout + result.stderr
-
-
-def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
-    """Wait for benchmark VM to be ready (cloud-init complete)."""
-    print(f"  Waiting for VM {vm_ip} to be ready...")
-
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            code, _ = run_ssh_command(
-                vm_ip, "test -f /root/benchmark-ready", timeout=15
-            )
-            if code == 0:
-                print("  VM is ready!")
-                return True
-        except Exception as e:
-            print(f"  SSH not ready yet: {e}")
-        time.sleep(10)
-
-    print(f"  Warning: VM not ready after {timeout}s, continuing anyway...")
-    return False
-
-
-def clear_known_hosts_on_vm(vm_ip: str) -> None:
-    """Clear known_hosts on benchmark VM to avoid stale host key errors.
-
-    When VMs are recreated, their host keys change. This causes SSH to reject
-    connections due to 'host key has changed' warnings.
-    """
-    try:
-        run_ssh_command(vm_ip, "rm -f /root/.ssh/known_hosts", timeout=10)
-    except Exception:
-        pass  # Ignore errors, file may not exist
 
 
 def wait_for_minio_ready(
@@ -278,51 +219,7 @@ def wait_for_minio_ready(
     return False
 
 
-def get_terraform(cloud_config: CloudConfig) -> Terraform:
-    """Get Terraform instance, initializing if needed."""
-    tf_dir = str(cloud_config.terraform_dir)
-    tf = Terraform(working_dir=tf_dir)
-
-    # Check if init needed
-    terraform_dir = cloud_config.terraform_dir / ".terraform"
-    if not terraform_dir.exists():
-        print(f"  Initializing Terraform in {tf_dir}...")
-        ret_code, stdout, stderr = tf.init()
-        if ret_code != 0:
-            raise RuntimeError(f"Terraform init failed: {stderr}")
-
-    return tf
-
-
-def is_stale_state_error(stderr: str | None) -> bool:
-    """Check if the error indicates stale terraform state."""
-    if stderr is None:
-        return False
-    return "not found" in stderr.lower() or "404" in stderr
-
-
-def clear_terraform_state(cloud_config: CloudConfig) -> None:
-    """Clear Terraform state files to start fresh."""
-    import os
-
-    tf_dir = cloud_config.terraform_dir
-    for f in ["terraform.tfstate", "terraform.tfstate.backup"]:
-        path = tf_dir / f
-        if path.exists():
-            os.remove(path)
-            print(f"  Removed stale state: {path}")
-
-
-def validate_vm_exists(vm_ip: str) -> bool:
-    """Check if VM is actually reachable (not just in state)."""
-    try:
-        code, _ = run_ssh_command(vm_ip, "echo ok", timeout=10)
-        return code == 0
-    except Exception:
-        return False
-
-
-def terraform_refresh_and_validate(tf: Terraform) -> bool:
+def terraform_refresh_and_validate(tf) -> bool:
     """Run terraform refresh and check if resources are valid."""
     ret_code, stdout, stderr = tf.refresh()
     # Check for "not found" errors indicating stale state
@@ -331,28 +228,11 @@ def terraform_refresh_and_validate(tf: Terraform) -> bool:
     return ret_code == 0
 
 
-def get_tf_output(tf: Terraform, name: str) -> str | None:
-    """Get terraform output value, handling different return formats."""
-    try:
-        # Use output_cmd to get raw output and parse it ourselves
-        ret, out, err = tf.output_cmd(name)
-        if ret != 0 or not out:
-            return None
-        # Output is JSON-formatted, strip quotes and newlines
-        value = out.strip().strip('"')
-        # Check if it's a valid value (not a warning message or null)
-        if not value or value == "null" or value.startswith("╷") or "Warning" in value:
-            return None
-        return value
-    except Exception:
-        return None
-
-
 def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     """Ensure benchmark VM exists and return its IP."""
     print(f"\nChecking benchmark VM for {cloud_config.name}...")
 
-    tf = get_terraform(cloud_config)
+    tf = get_terraform(cloud_config.terraform_dir)
 
     # Check if VM already exists in state
     vm_ip = get_tf_output(tf, "benchmark_vm_ip")
@@ -367,8 +247,10 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
             # Try to refresh and see if resources still exist
             if not terraform_refresh_and_validate(tf):
                 print("  State is stale (resources deleted), clearing state...")
-                clear_terraform_state(cloud_config)
-                tf = get_terraform(cloud_config)  # Re-init after clearing state
+                clear_terraform_state(cloud_config.terraform_dir)
+                tf = get_terraform(
+                    cloud_config.terraform_dir
+                )  # Re-init after clearing state
             else:
                 # Resources exist but VM not reachable yet, wait for it
                 print("  Resources exist, waiting for VM to become ready...")
@@ -384,8 +266,8 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
         # Check if it's a stale state error
         if is_stale_state_error(stderr):
             print("  Stale state detected, clearing and retrying...")
-            clear_terraform_state(cloud_config)
-            tf = get_terraform(cloud_config)
+            clear_terraform_state(cloud_config.terraform_dir)
+            tf = get_terraform(cloud_config.terraform_dir)
             ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
 
         if ret_code != 0:
@@ -438,7 +320,7 @@ def deploy_minio(
     print(f"  Deploying MinIO on {cloud_config.name}: {config}")
     start = time.time()
 
-    tf = get_terraform(cloud_config)
+    tf = get_terraform(cloud_config.terraform_dir)
 
     # Build variables for terraform apply
     tf_vars = {
@@ -463,8 +345,8 @@ def deploy_minio(
         # Check for stale state errors
         if is_stale_state_error(stderr):
             print("  Stale state detected, clearing and retrying...")
-            clear_terraform_state(cloud_config)
-            tf = get_terraform(cloud_config)
+            clear_terraform_state(cloud_config.terraform_dir)
+            tf = get_terraform(cloud_config.terraform_dir)
             continue
 
         # Check for IP conflict (OpenStack hasn't released ports yet)
@@ -498,7 +380,7 @@ def destroy_minio(cloud_config: CloudConfig) -> tuple[bool, float]:
     print(f"  Destroying MinIO on {cloud_config.name}...")
     start = time.time()
 
-    tf = get_terraform(cloud_config)
+    tf = get_terraform(cloud_config.terraform_dir)
 
     # Apply with minio_enabled=false to destroy MinIO but keep VM
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var={"minio_enabled": False})
@@ -507,7 +389,7 @@ def destroy_minio(cloud_config: CloudConfig) -> tuple[bool, float]:
         # Handle stale state gracefully
         if is_stale_state_error(stderr):
             print("  Stale state detected during MinIO destroy, clearing state...")
-            clear_terraform_state(cloud_config)
+            clear_terraform_state(cloud_config.terraform_dir)
             return True, time.time() - start  # State cleared, nothing to destroy
         print(f"  Warning: MinIO destroy may have failed: {stderr}")
         return False, time.time() - start
@@ -515,36 +397,6 @@ def destroy_minio(cloud_config: CloudConfig) -> tuple[bool, float]:
     duration = time.time() - start
     print(f"  MinIO destroyed in {duration:.1f}s")
     return True, duration
-
-
-def destroy_all(cloud_config: CloudConfig) -> bool:
-    """Destroy all infrastructure."""
-    import subprocess
-
-    print(f"\nDestroying all resources on {cloud_config.name}...")
-
-    tf_dir = str(cloud_config.terraform_dir)
-
-    # Run terraform destroy directly (python_terraform uses deprecated -force flag)
-    result = subprocess.run(
-        ["terraform", "destroy", "-auto-approve"],
-        cwd=tf_dir,
-        capture_output=True,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        stderr = result.stderr
-        # Handle stale state - resources may already be gone
-        if is_stale_state_error(stderr):
-            print("  Resources already deleted, clearing stale state...")
-            clear_terraform_state(cloud_config)
-            return True
-        print(f"  Warning: Destroy may have failed: {stderr}")
-        return False
-
-    print("  All resources destroyed.")
-    return True
 
 
 def run_warp_benchmark(
@@ -815,7 +667,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(cloud)
+    results = load_results(results_file(cloud))
 
     total_drives = config["nodes"] * config["drives_per_node"]
     cost = calculate_cost(config, cloud_config)
@@ -875,8 +727,7 @@ def save_result(
         }
     )
 
-    with open(results_file(cloud), "w") as f:
-        json.dump(results, f, indent=2)
+    save_results(results, results_file(cloud))
 
 
 def objective(
@@ -1129,7 +980,7 @@ Examples:
     finally:
         # Cleanup
         if not args.no_destroy:
-            destroy_all(cloud_config)
+            destroy_all(cloud_config.terraform_dir, cloud_config.name)
         else:
             print("\n--no-destroy specified, keeping infrastructure.")
 

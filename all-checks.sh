@@ -8,7 +8,7 @@ echo "========================================"
 ./check.sh
 ./health.sh
 ./terraform/check.sh
-./optuna/minio-optimizer/check.sh
+./optuna/check.sh
 
 echo ""
 echo "========================================"

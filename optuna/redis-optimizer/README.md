@@ -13,9 +13,9 @@ Bayesian optimization for finding the best Redis configuration using Optuna.
 
 ## Supported Modes
 
-| Mode     | Nodes | Description                                        |
-| -------- | ----- | -------------------------------------------------- |
-| single   | 1     | Single Redis instance at 10.0.0.20                 |
+| Mode     | Nodes | Description                                         |
+| -------- | ----- | --------------------------------------------------- |
+| single   | 1     | Single Redis instance at 10.0.0.20                  |
 | sentinel | 3     | 1 master + 2 replicas with Sentinel at 10.0.0.20-22 |
 
 ## Setup
@@ -68,15 +68,16 @@ uv run python redis-optimizer/optimizer.py --cloud selectel --trials 5
 
 ## Metrics
 
-| Metric          | Direction | Description                    |
-| --------------- | --------- | ------------------------------ |
-| ops_per_sec     | Maximize  | Total operations per second    |
-| p99_latency_ms  | Minimize  | 99th percentile latency in ms  |
-| cost_efficiency | Maximize  | ops/sec per $/hr               |
+| Metric          | Direction | Description                   |
+| --------------- | --------- | ----------------------------- |
+| ops_per_sec     | Maximize  | Total operations per second   |
+| p99_latency_ms  | Minimize  | 99th percentile latency in ms |
+| cost_efficiency | Maximize  | ops/sec per $/hr              |
 
 ## Benchmark Workload
 
 Uses `memtier_benchmark` with:
+
 - **80% GET / 20% SET** ratio
 - 16 threads, 50 connections per thread
 - 10,000 requests per connection
@@ -85,6 +86,7 @@ Uses `memtier_benchmark` with:
 ## Infrastructure
 
 Redis nodes are deployed at:
+
 - **Single mode**: 10.0.0.20
 - **Sentinel mode**: 10.0.0.20 (master), 10.0.0.21-22 (replicas)
 
