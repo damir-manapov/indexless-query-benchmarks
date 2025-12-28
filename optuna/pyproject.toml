@@ -1,7 +1,7 @@
 [project]
-name = "minio-optimizer"
+name = "optuna-optimizers"
 version = "0.1.0"
-description = "Bayesian optimization for MinIO cluster configuration"
+description = "Bayesian optimization for cloud infrastructure (MinIO, Redis)"
 requires-python = ">=3.11"
 dependencies = [
     "optuna>=3.5.0",

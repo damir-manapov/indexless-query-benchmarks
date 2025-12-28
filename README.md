@@ -110,7 +110,7 @@ Two cloud providers are supported:
 - **Selectel** - OpenStack-based, see [terraform/selectel/README.md](terraform/selectel/README.md)
 - **Timeweb** - Simple API, see [terraform/timeweb/README.md](terraform/timeweb/README.md)
 
-For automated MinIO configuration optimization using Bayesian search, see [optuna/minio-optimizer/README.md](optuna/minio-optimizer/README.md).
+For automated infrastructure optimization (MinIO, Redis) using Bayesian search, see [optuna/README.md](optuna/README.md).
 
 ```bash
 # Selectel

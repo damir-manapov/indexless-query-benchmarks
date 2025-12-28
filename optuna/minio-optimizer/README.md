@@ -31,7 +31,7 @@ The optimizer is fully self-sufficient and handles:
 ## Setup
 
 ```bash
-cd optuna/minio-optimizer
+cd optuna
 uv sync
 ```
 
@@ -39,27 +39,27 @@ uv sync
 
 ```bash
 # Run optimization on Selectel (5 trials, destroy at end)
-uv run python optimizer_multicloud.py --cloud selectel --trials 5
+uv run python minio-optimizer/optimizer.py --cloud selectel --trials 5
 
 # Run on Timeweb, keep infrastructure after
-uv run python optimizer_multicloud.py --cloud timeweb --trials 10 --no-destroy
+uv run python minio-optimizer/optimizer.py --cloud timeweb --trials 10 --no-destroy
 
 # Resume a previous study (uses cached results)
-uv run python optimizer_multicloud.py --cloud selectel --trials 20
+uv run python minio-optimizer/optimizer.py --cloud selectel --trials 20
 ```
 
 ### From Scratch (Full Self-Sufficiency Test)
 
 ```bash
 # Clear everything and start fresh
-cd ../../terraform/selectel
+cd terraform/selectel
 terraform destroy -auto-approve
 rm -f terraform.tfstate terraform.tfstate.backup
-cd ../../optuna/minio-optimizer
-rm -f study.db results_selectel.json
+cd ../../optuna
+rm -f minio-optimizer/study.db minio-optimizer/results_selectel.json
 
 # Run - it will create everything from scratch
-uv run python optimizer_multicloud.py --cloud selectel --trials 5
+uv run python minio-optimizer/optimizer.py --cloud selectel --trials 5
 ```
 
 ## Configuration Space

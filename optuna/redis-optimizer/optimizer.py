@@ -60,6 +60,7 @@ class MemtierResult:
 class BenchmarkResult:
     config: dict
     ops_per_sec: float = 0.0
+    p50_latency_ms: float = 0.0
     p99_latency_ms: float = 0.0
     p999_latency_ms: float = 0.0
     avg_latency_ms: float = 0.0
@@ -111,8 +112,10 @@ def run_ssh_command(
     """Run command on remote VM via SSH."""
     ssh_args = [
         "ssh",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "ConnectTimeout=10",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "ConnectTimeout=10",
     ]
     if forward_agent:
         ssh_args.append("-A")
@@ -134,7 +137,9 @@ def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
     start = time.time()
     while time.time() - start < timeout:
         try:
-            code, _ = run_ssh_command(vm_ip, "test -f /root/benchmark-ready", timeout=15)
+            code, _ = run_ssh_command(
+                vm_ip, "test -f /root/benchmark-ready", timeout=15
+            )
             if code == 0:
                 print("  VM is ready!")
                 return True
@@ -170,7 +175,9 @@ def wait_for_redis_ready(
                 f"ssh -A -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@{redis_ip} "
                 f"'test -f /root/redis-ready && redis-cli ping'"
             )
-            code, output = run_ssh_command(vm_ip, check_cmd, timeout=20, forward_agent=True)
+            code, output = run_ssh_command(
+                vm_ip, check_cmd, timeout=20, forward_agent=True
+            )
             if code == 0 and "PONG" in output:
                 print(f"  Redis is ready! ({elapsed:.0f}s)")
                 return True
@@ -256,12 +263,16 @@ def ensure_benchmark_vm(cloud_config: CloudConfig) -> str:
     )
     code, output = run_ssh_command(vm_ip, install_cmd, timeout=300)
     if code != 0:
-        print(f"  Warning: memtier_benchmark installation may have failed: {output[:500]}")
+        print(
+            f"  Warning: memtier_benchmark installation may have failed: {output[:500]}"
+        )
 
     return vm_ip
 
 
-def deploy_redis(config: dict, cloud_config: CloudConfig, vm_ip: str) -> tuple[bool, float]:
+def deploy_redis(
+    config: dict, cloud_config: CloudConfig, vm_ip: str
+) -> tuple[bool, float]:
     """Deploy Redis with given configuration."""
     print(f"  Deploying Redis on {cloud_config.name}: {config}")
     start = time.time()
@@ -421,23 +432,25 @@ def save_result(
     cost = calculate_cost(config, cloud_config)
     cost_efficiency = result.ops_per_sec / cost if cost > 0 else 0
 
-    results.append({
-        "trial": trial_number,
-        "timestamp": datetime.now().isoformat(),
-        "cloud": cloud,
-        "config": config,
-        "nodes": 1 if config["mode"] == "single" else 3,
-        "cost_per_hour": cost,
-        "cost_efficiency": cost_efficiency,
-        "ops_per_sec": result.ops_per_sec,
-        "avg_latency_ms": result.avg_latency_ms,
-        "p50_latency_ms": result.p50_latency_ms,
-        "p99_latency_ms": result.p99_latency_ms,
-        "p999_latency_ms": result.p999_latency_ms,
-        "kb_per_sec": result.kb_per_sec,
-        "duration_s": result.duration_s,
-        "error": result.error,
-    })
+    results.append(
+        {
+            "trial": trial_number,
+            "timestamp": datetime.now().isoformat(),
+            "cloud": cloud,
+            "config": config,
+            "nodes": 1 if config["mode"] == "single" else 3,
+            "cost_per_hour": cost,
+            "cost_efficiency": cost_efficiency,
+            "ops_per_sec": result.ops_per_sec,
+            "avg_latency_ms": result.avg_latency_ms,
+            "p50_latency_ms": result.p50_latency_ms,
+            "p99_latency_ms": result.p99_latency_ms,
+            "p999_latency_ms": result.p999_latency_ms,
+            "kb_per_sec": result.kb_per_sec,
+            "duration_s": result.duration_s,
+            "error": result.error,
+        }
+    )
 
     with open(results_file(cloud), "w") as f:
         json.dump(results, f, indent=2)
@@ -464,11 +477,21 @@ def objective(
 
     config = {
         "mode": trial.suggest_categorical("mode", config_space["mode"]),
-        "cpu_per_node": trial.suggest_categorical("cpu_per_node", config_space["cpu_per_node"]),
-        "ram_per_node": trial.suggest_categorical("ram_per_node", config_space["ram_per_node"]),
-        "maxmemory_policy": trial.suggest_categorical("maxmemory_policy", config_space["maxmemory_policy"]),
-        "io_threads": trial.suggest_categorical("io_threads", config_space["io_threads"]),
-        "persistence": trial.suggest_categorical("persistence", config_space["persistence"]),
+        "cpu_per_node": trial.suggest_categorical(
+            "cpu_per_node", config_space["cpu_per_node"]
+        ),
+        "ram_per_node": trial.suggest_categorical(
+            "ram_per_node", config_space["ram_per_node"]
+        ),
+        "maxmemory_policy": trial.suggest_categorical(
+            "maxmemory_policy", config_space["maxmemory_policy"]
+        ),
+        "io_threads": trial.suggest_categorical(
+            "io_threads", config_space["io_threads"]
+        ),
+        "persistence": trial.suggest_categorical(
+            "persistence", config_space["persistence"]
+        ),
     }
 
     print(f"\n{'=' * 60}")
@@ -492,7 +515,10 @@ def objective(
     if not success:
         save_result(
             BenchmarkResult(config=config, error="Deploy failed"),
-            config, trial.number, cloud, cloud_config,
+            config,
+            trial.number,
+            cloud,
+            cloud_config,
         )
         return 0.0 if metric != "p99_latency_ms" else -float("inf")
 
@@ -502,7 +528,10 @@ def objective(
     if result is None or result.ops_per_sec == 0:
         save_result(
             BenchmarkResult(config=config, error="Benchmark failed"),
-            config, trial.number, cloud, cloud_config,
+            config,
+            trial.number,
+            cloud,
+            cloud_config,
         )
         return 0.0 if metric != "p99_latency_ms" else -float("inf")
 
@@ -517,9 +546,10 @@ def objective(
     }
 
     metric_value = get_metric_value(result_metrics, metric)
-    display_value = abs(metric_value) if metric == "p99_latency_ms" else metric_value
 
-    print(f"  Result: {result.ops_per_sec:.0f} ops/s, p99={result.p99_latency_ms:.2f}ms, Cost: {cost:.2f}/hr")
+    print(
+        f"  Result: {result.ops_per_sec:.0f} ops/s, p99={result.p99_latency_ms:.2f}ms, Cost: {cost:.2f}/hr"
+    )
 
     return metric_value
 
@@ -550,7 +580,7 @@ Examples:
         "--metric",
         choices=list(METRICS.keys()),
         default="ops_per_sec",
-        help=f"Metric to optimize (default: ops_per_sec)",
+        help="Metric to optimize (default: ops_per_sec)",
     )
     parser.add_argument(
         "--trials",
@@ -619,7 +649,9 @@ Examples:
 
     try:
         study.optimize(
-            lambda trial: objective(trial, args.cloud, cloud_config, vm_ip, args.metric),
+            lambda trial: objective(
+                trial, args.cloud, cloud_config, vm_ip, args.metric
+            ),
             n_trials=args.trials,
             show_progress_bar=True,
         )
@@ -632,10 +664,12 @@ Examples:
             best = study.best_trial
             print(f"Best trial: {best.number}")
             print(f"Best config: {best.params}")
-            if args.metric == "p99_latency_ms":
+            if args.metric == "p99_latency_ms" and best.value is not None:
                 print(f"Best {args.metric}: {-best.value:.2f}ms")
-            else:
+            elif best.value is not None:
                 print(f"Best {args.metric}: {best.value:.2f}")
+            else:
+                print(f"Best {args.metric}: N/A")
 
             best_cost = calculate_cost(best.params, cloud_config)
             print(f"Best config cost: {best_cost:.2f}/hr")
