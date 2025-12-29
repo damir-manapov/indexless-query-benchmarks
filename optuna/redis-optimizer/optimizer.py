@@ -108,6 +108,72 @@ def show_results(cloud: str) -> None:
     print(f"Best by efficiency:  {best_efficiency.get('cost_efficiency', 0):>10.0f} ops/$/hr  [{config_summary(best_efficiency)}]")
 
 
+def export_results_md(cloud: str, output_path: Path | None = None) -> None:
+    """Export benchmark results to a markdown file."""
+    results = load_results(results_file(cloud))
+
+    if not results:
+        print(f"No results found for {cloud}")
+        return
+
+    if output_path is None:
+        output_path = RESULTS_DIR / f"RESULTS_{cloud.upper()}.md"
+
+    results_sorted = sorted(results, key=lambda x: x.get("ops_per_sec", 0), reverse=True)
+
+    lines = [
+        f"# Redis Benchmark Results - {cloud.upper()}",
+        "",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Results",
+        "",
+        "| # | Mode | Nodes | CPU | RAM | Policy | IO | Persist | Ops/s | p99 (ms) | $/hr | Efficiency |",
+        "|--:|------|------:|----:|----:|--------|---:|---------|------:|---------:|-----:|-----------:|",
+    ]
+
+    for i, r in enumerate(results_sorted, 1):
+        cfg = r.get("config", {})
+        mode = cfg.get("mode", "?")
+        nodes = r.get("nodes", 1 if mode == "single" else 3)
+        cpu = cfg.get("cpu_per_node", 0)
+        ram = cfg.get("ram_per_node", 0)
+        policy = cfg.get("maxmemory_policy", "?")
+        io = cfg.get("io_threads", 0)
+        persist = cfg.get("persistence", "?")
+        ops = r.get("ops_per_sec", 0)
+        p99 = r.get("p99_latency_ms", 0)
+        cost = r.get("cost_per_hour", 0)
+        eff = r.get("cost_efficiency", 0)
+
+        lines.append(
+            f"| {i} | {mode} | {nodes} | {cpu} | {ram} | {policy} | {io} | {persist} | {ops:.0f} | {p99:.2f} | {cost:.2f} | {eff:.0f} |"
+        )
+
+    # Best configs
+    best_ops = max(results, key=lambda x: x.get("ops_per_sec", 0))
+    best_latency = min(results, key=lambda x: x.get("p99_latency_ms", float("inf")))
+    best_efficiency = max(results, key=lambda x: x.get("cost_efficiency", 0))
+
+    def config_summary(r: dict) -> str:
+        c = r.get("config", {})
+        nodes = r.get("nodes", 1 if c.get("mode") == "single" else 3)
+        return f"{c.get('mode', '?')} {nodes}×{c.get('cpu_per_node', 0)}cpu/{c.get('ram_per_node', 0)}gb io={c.get('io_threads', 0)} {c.get('persistence', '?')}"
+
+    lines.extend([
+        "",
+        "## Best Configurations",
+        "",
+        f"- **Best by ops/sec:** {best_ops.get('ops_per_sec', 0):.0f} ops/s — `{config_summary(best_ops)}`",
+        f"- **Best by p99 latency:** {best_latency.get('p99_latency_ms', 0):.2f}ms — `{config_summary(best_latency)}`",
+        f"- **Best by efficiency:** {best_efficiency.get('cost_efficiency', 0):.0f} ops/$/hr — `{config_summary(best_efficiency)}`",
+        "",
+    ])
+
+    output_path.write_text("\n".join(lines))
+    print(f"Results exported to {output_path}")
+
+
 
 def results_file(cloud: str) -> Path:
     """Get results file path for a cloud."""
@@ -519,6 +585,9 @@ Examples:
 
   # Show all results
   uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
+
+  # Export results to markdown
+  uv run python redis-optimizer/optimizer.py --cloud selectel --export-md
         """,
     )
     parser.add_argument(
@@ -559,11 +628,21 @@ Examples:
         action="store_true",
         help="Show all benchmark results and exit",
     )
+    parser.add_argument(
+        "--export-md",
+        action="store_true",
+        help="Export results to markdown file and exit",
+    )
     args = parser.parse_args()
 
     # Handle --show-results
     if args.show_results:
         show_results(args.cloud)
+        return
+
+    # Handle --export-md
+    if args.export_md:
+        export_results_md(args.cloud)
         return
 
     cloud_config = get_cloud_config(args.cloud)

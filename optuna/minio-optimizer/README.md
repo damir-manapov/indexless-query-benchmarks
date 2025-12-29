@@ -49,6 +49,9 @@ uv run python minio-optimizer/optimizer.py --cloud selectel --trials 20
 
 # Show all benchmark results
 uv run python minio-optimizer/optimizer.py --cloud selectel --show-results
+
+# Export results to markdown
+uv run python minio-optimizer/optimizer.py --cloud selectel --export-md
 ```
 
 ### From Scratch (Full Self-Sufficiency Test)

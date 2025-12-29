@@ -42,6 +42,9 @@ uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --no-des
 
 # Show all benchmark results
 uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
+
+# Export results to markdown
+uv run python redis-optimizer/optimizer.py --cloud selectel --export-md
 ```
 
 ### From Scratch

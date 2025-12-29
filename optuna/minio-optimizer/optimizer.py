@@ -113,6 +113,73 @@ def show_results(cloud: str) -> None:
     print(f"Best by PUT:        {best_put.get('put_mib_s', 0):>8.1f} MiB/s     [{config_summary(best_put)}]")
     print(f"Best by efficiency: {best_efficiency.get('cost_efficiency', 0):>8.1f} MiB/s/$/hr  [{config_summary(best_efficiency)}]")
 
+
+def export_results_md(cloud: str, output_path: Path | None = None) -> None:
+    """Export benchmark results to a markdown file."""
+    results = load_results(results_file(cloud))
+
+    if not results:
+        print(f"No results found for {cloud}")
+        return
+
+    if output_path is None:
+        output_path = RESULTS_DIR / f"RESULTS_{cloud.upper()}.md"
+
+    results_sorted = sorted(results, key=lambda x: x.get("total_mib_s", 0), reverse=True)
+
+    lines = [
+        f"# MinIO Benchmark Results - {cloud.upper()}",
+        "",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Results",
+        "",
+        "| # | Nodes | CPU | RAM | Drives | Size | Type | Total (MiB/s) | GET | PUT | $/hr | Efficiency |",
+        "|--:|------:|----:|----:|-------:|-----:|------|-------------:|----:|----:|-----:|-----------:|",
+    ]
+
+    for i, r in enumerate(results_sorted, 1):
+        cfg = r.get("config", {})
+        nodes = cfg.get("nodes", 0)
+        cpu = cfg.get("cpu_per_node", 0)
+        ram = cfg.get("ram_per_node", 0)
+        drives = cfg.get("drives_per_node", 0)
+        size = cfg.get("drive_size_gb", 0)
+        dtype = cfg.get("drive_type", "?")
+        total = r.get("total_mib_s", 0)
+        get_mib = r.get("get_mib_s", 0)
+        put_mib = r.get("put_mib_s", 0)
+        cost = r.get("cost_per_hour", 0)
+        eff = r.get("cost_efficiency", 0)
+
+        lines.append(
+            f"| {i} | {nodes} | {cpu} | {ram} | {drives} | {size} | {dtype} | {total:.1f} | {get_mib:.1f} | {put_mib:.1f} | {cost:.2f} | {eff:.1f} |"
+        )
+
+    # Best configs
+    best_total = max(results, key=lambda x: x.get("total_mib_s", 0))
+    best_get = max(results, key=lambda x: x.get("get_mib_s", 0))
+    best_put = max(results, key=lambda x: x.get("put_mib_s", 0))
+    best_efficiency = max(results, key=lambda x: x.get("cost_efficiency", 0))
+
+    def config_summary(r: dict) -> str:
+        c = r.get("config", {})
+        return f"{c.get('nodes', 0)}n×{c.get('cpu_per_node', 0)}cpu/{c.get('ram_per_node', 0)}gb {c.get('drives_per_node', 0)}×{c.get('drive_size_gb', 0)}gb {c.get('drive_type', '?')}"
+
+    lines.extend([
+        "",
+        "## Best Configurations",
+        "",
+        f"- **Best by total:** {best_total.get('total_mib_s', 0):.1f} MiB/s — `{config_summary(best_total)}`",
+        f"- **Best by GET:** {best_get.get('get_mib_s', 0):.1f} MiB/s — `{config_summary(best_get)}`",
+        f"- **Best by PUT:** {best_put.get('put_mib_s', 0):.1f} MiB/s — `{config_summary(best_put)}`",
+        f"- **Best by efficiency:** {best_efficiency.get('cost_efficiency', 0):.1f} MiB/s/$/hr — `{config_summary(best_efficiency)}`",
+        "",
+    ])
+
+    output_path.write_text("\n".join(lines))
+    print(f"Results exported to {output_path}")
+
 def get_metric_value(result: dict, metric: str) -> float:
     """Extract the optimization metric value from a result."""
     return result.get(metric, 0)
@@ -930,6 +997,9 @@ Examples:
 
   # Show all results
   uv run python minio-optimizer/optimizer.py --cloud selectel --show-results
+
+  # Export results to markdown
+  uv run python minio-optimizer/optimizer.py --cloud selectel --export-md
         """,
     )
     parser.add_argument(
@@ -970,11 +1040,21 @@ Examples:
         action="store_true",
         help="Show all benchmark results and exit",
     )
+    parser.add_argument(
+        "--export-md",
+        action="store_true",
+        help="Export results to markdown file and exit",
+    )
     args = parser.parse_args()
 
     # Handle --show-results
     if args.show_results:
         show_results(args.cloud)
+        return
+
+    # Handle --export-md
+    if args.export_md:
+        export_results_md(args.cloud)
         return
 
     cloud_config = get_cloud_config(args.cloud)
