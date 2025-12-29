@@ -4,10 +4,10 @@ Bayesian optimization for cloud infrastructure configurations using [Optuna](htt
 
 ## Optimizers
 
-| Optimizer                               | Target                    | Benchmark Tool    |
-| --------------------------------------- | ------------------------- | ----------------- |
-| [minio-optimizer](minio-optimizer/)     | MinIO distributed storage | warp              |
-| [redis-optimizer](redis-optimizer/)     | Redis cache               | memtier_benchmark |
+| Optimizer                                 | Target                    | Benchmark Tool    |
+| ----------------------------------------- | ------------------------- | ----------------- |
+| [minio-optimizer](minio-optimizer/)       | MinIO distributed storage | warp              |
+| [redis-optimizer](redis-optimizer/)       | Redis cache               | memtier_benchmark |
 | [postgres-optimizer](postgres-optimizer/) | PostgreSQL database       | pgbench           |
 
 ## Setup
