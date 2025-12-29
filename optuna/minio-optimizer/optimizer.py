@@ -69,25 +69,29 @@ def format_results(cloud: str) -> dict | None:
     if not results:
         return None
 
-    results_sorted = sorted(results, key=lambda x: x.get("total_mib_s", 0), reverse=True)
+    results_sorted = sorted(
+        results, key=lambda x: x.get("total_mib_s", 0), reverse=True
+    )
 
     # Extract row data
     rows = []
     for r in results_sorted:
         cfg = r.get("config", {})
-        rows.append({
-            "nodes": cfg.get("nodes", 0),
-            "cpu": cfg.get("cpu_per_node", 0),
-            "ram": cfg.get("ram_per_node", 0),
-            "drives": cfg.get("drives_per_node", 0),
-            "size": cfg.get("drive_size_gb", 0),
-            "dtype": cfg.get("drive_type", "?"),
-            "total": r.get("total_mib_s", 0),
-            "get": r.get("get_mib_s", 0),
-            "put": r.get("put_mib_s", 0),
-            "cost": r.get("cost_per_hour", 0),
-            "eff": r.get("cost_efficiency", 0),
-        })
+        rows.append(
+            {
+                "nodes": cfg.get("nodes", 0),
+                "cpu": cfg.get("cpu_per_node", 0),
+                "ram": cfg.get("ram_per_node", 0),
+                "drives": cfg.get("drives_per_node", 0),
+                "size": cfg.get("drive_size_gb", 0),
+                "dtype": cfg.get("drive_type", "?"),
+                "total": r.get("total_mib_s", 0),
+                "get": r.get("get_mib_s", 0),
+                "put": r.get("put_mib_s", 0),
+                "cost": r.get("cost_per_hour", 0),
+                "eff": r.get("cost_efficiency", 0),
+            }
+        )
 
     # Best configs
     best_total = max(results, key=lambda x: x.get("total_mib_s", 0))
@@ -99,10 +103,22 @@ def format_results(cloud: str) -> dict | None:
         "cloud": cloud,
         "rows": rows,
         "best": {
-            "total": {"value": best_total.get("total_mib_s", 0), "config": config_summary(best_total)},
-            "get": {"value": best_get.get("get_mib_s", 0), "config": config_summary(best_get)},
-            "put": {"value": best_put.get("put_mib_s", 0), "config": config_summary(best_put)},
-            "efficiency": {"value": best_efficiency.get("cost_efficiency", 0), "config": config_summary(best_efficiency)},
+            "total": {
+                "value": best_total.get("total_mib_s", 0),
+                "config": config_summary(best_total),
+            },
+            "get": {
+                "value": best_get.get("get_mib_s", 0),
+                "config": config_summary(best_get),
+            },
+            "put": {
+                "value": best_put.get("put_mib_s", 0),
+                "config": config_summary(best_put),
+            },
+            "efficiency": {
+                "value": best_efficiency.get("cost_efficiency", 0),
+                "config": config_summary(best_efficiency),
+            },
         },
     }
 
@@ -115,9 +131,9 @@ def show_results(cloud: str) -> None:
         print(f"No results found for {cloud}")
         return
 
-    print(f"\n{'='*110}")
+    print(f"\n{'=' * 110}")
     print(f"MinIO Benchmark Results - {cloud.upper()}")
-    print(f"{'='*110}")
+    print(f"{'=' * 110}")
 
     # Header
     print(
@@ -136,10 +152,18 @@ def show_results(cloud: str) -> None:
     print(f"Total: {len(data['rows'])} results")
 
     best = data["best"]
-    print(f"\nBest by total:      {best['total']['value']:>8.1f} {'MiB/s':<11} [{best['total']['config']}]")
-    print(f"Best by GET:        {best['get']['value']:>8.1f} {'MiB/s':<11} [{best['get']['config']}]")
-    print(f"Best by PUT:        {best['put']['value']:>8.1f} {'MiB/s':<11} [{best['put']['config']}]")
-    print(f"Best by efficiency: {best['efficiency']['value']:>8.1f} {'MiB/s/$/hr':<11} [{best['efficiency']['config']}]")
+    print(
+        f"\nBest by total:      {best['total']['value']:>8.1f} {'MiB/s':<11} [{best['total']['config']}]"
+    )
+    print(
+        f"Best by GET:        {best['get']['value']:>8.1f} {'MiB/s':<11} [{best['get']['config']}]"
+    )
+    print(
+        f"Best by PUT:        {best['put']['value']:>8.1f} {'MiB/s':<11} [{best['put']['config']}]"
+    )
+    print(
+        f"Best by efficiency: {best['efficiency']['value']:>8.1f} {'MiB/s/$/hr':<11} [{best['efficiency']['config']}]"
+    )
 
 
 def export_results_md(cloud: str, output_path: Path | None = None) -> None:
@@ -170,19 +194,22 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
         )
 
     best = data["best"]
-    lines.extend([
-        "",
-        "## Best Configurations",
-        "",
-        f"- **Best by total:** {best['total']['value']:.1f} MiB/s — `{best['total']['config']}`",
-        f"- **Best by GET:** {best['get']['value']:.1f} MiB/s — `{best['get']['config']}`",
-        f"- **Best by PUT:** {best['put']['value']:.1f} MiB/s — `{best['put']['config']}`",
-        f"- **Best by efficiency:** {best['efficiency']['value']:.1f} MiB/s/$/hr — `{best['efficiency']['config']}`",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Best Configurations",
+            "",
+            f"- **Best by total:** {best['total']['value']:.1f} MiB/s — `{best['total']['config']}`",
+            f"- **Best by GET:** {best['get']['value']:.1f} MiB/s — `{best['get']['config']}`",
+            f"- **Best by PUT:** {best['put']['value']:.1f} MiB/s — `{best['put']['config']}`",
+            f"- **Best by efficiency:** {best['efficiency']['value']:.1f} MiB/s/$/hr — `{best['efficiency']['config']}`",
+            "",
+        ]
+    )
 
     output_path.write_text("\n".join(lines))
     print(f"Results exported to {output_path}")
+
 
 def get_metric_value(result: dict, metric: str) -> float:
     """Extract the optimization metric value from a result."""

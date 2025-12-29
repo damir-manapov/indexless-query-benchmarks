@@ -66,26 +66,30 @@ def format_results(cloud: str) -> dict | None:
     if not results:
         return None
 
-    results_sorted = sorted(results, key=lambda x: x.get("ops_per_sec", 0), reverse=True)
+    results_sorted = sorted(
+        results, key=lambda x: x.get("ops_per_sec", 0), reverse=True
+    )
 
     # Extract row data
     rows = []
     for r in results_sorted:
         cfg = r.get("config", {})
         mode = cfg.get("mode", "?")
-        rows.append({
-            "mode": mode,
-            "nodes": r.get("nodes", 1 if mode == "single" else 3),
-            "cpu": cfg.get("cpu_per_node", 0),
-            "ram": cfg.get("ram_per_node", 0),
-            "policy": cfg.get("maxmemory_policy", "?"),
-            "io": cfg.get("io_threads", 0),
-            "persist": cfg.get("persistence", "?"),
-            "ops": r.get("ops_per_sec", 0),
-            "p99": r.get("p99_latency_ms", 0),
-            "cost": r.get("cost_per_hour", 0),
-            "eff": r.get("cost_efficiency", 0),
-        })
+        rows.append(
+            {
+                "mode": mode,
+                "nodes": r.get("nodes", 1 if mode == "single" else 3),
+                "cpu": cfg.get("cpu_per_node", 0),
+                "ram": cfg.get("ram_per_node", 0),
+                "policy": cfg.get("maxmemory_policy", "?"),
+                "io": cfg.get("io_threads", 0),
+                "persist": cfg.get("persistence", "?"),
+                "ops": r.get("ops_per_sec", 0),
+                "p99": r.get("p99_latency_ms", 0),
+                "cost": r.get("cost_per_hour", 0),
+                "eff": r.get("cost_efficiency", 0),
+            }
+        )
 
     # Best configs
     best_ops = max(results, key=lambda x: x.get("ops_per_sec", 0))
@@ -96,9 +100,18 @@ def format_results(cloud: str) -> dict | None:
         "cloud": cloud,
         "rows": rows,
         "best": {
-            "ops": {"value": best_ops.get("ops_per_sec", 0), "config": config_summary(best_ops)},
-            "latency": {"value": best_latency.get("p99_latency_ms", 0), "config": config_summary(best_latency)},
-            "efficiency": {"value": best_efficiency.get("cost_efficiency", 0), "config": config_summary(best_efficiency)},
+            "ops": {
+                "value": best_ops.get("ops_per_sec", 0),
+                "config": config_summary(best_ops),
+            },
+            "latency": {
+                "value": best_latency.get("p99_latency_ms", 0),
+                "config": config_summary(best_latency),
+            },
+            "efficiency": {
+                "value": best_efficiency.get("cost_efficiency", 0),
+                "config": config_summary(best_efficiency),
+            },
         },
     }
 
@@ -111,9 +124,9 @@ def show_results(cloud: str) -> None:
         print(f"No results found for {cloud}")
         return
 
-    print(f"\n{'='*100}")
+    print(f"\n{'=' * 100}")
     print(f"Redis Benchmark Results - {cloud.upper()}")
-    print(f"{'='*100}")
+    print(f"{'=' * 100}")
 
     # Header
     print(
@@ -132,9 +145,15 @@ def show_results(cloud: str) -> None:
     print(f"Total: {len(data['rows'])} results")
 
     best = data["best"]
-    print(f"\nBest by ops/sec:     {best['ops']['value']:>10.0f} {'ops/s':<9} [{best['ops']['config']}]")
-    print(f"Best by p99 latency: {best['latency']['value']:>10.2f} {'ms':<9} [{best['latency']['config']}]")
-    print(f"Best by efficiency:  {best['efficiency']['value']:>10.0f} {'ops/$/hr':<9} [{best['efficiency']['config']}]")
+    print(
+        f"\nBest by ops/sec:     {best['ops']['value']:>10.0f} {'ops/s':<9} [{best['ops']['config']}]"
+    )
+    print(
+        f"Best by p99 latency: {best['latency']['value']:>10.2f} {'ms':<9} [{best['latency']['config']}]"
+    )
+    print(
+        f"Best by efficiency:  {best['efficiency']['value']:>10.0f} {'ops/$/hr':<9} [{best['efficiency']['config']}]"
+    )
 
 
 def export_results_md(cloud: str, output_path: Path | None = None) -> None:
@@ -165,19 +184,20 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
         )
 
     best = data["best"]
-    lines.extend([
-        "",
-        "## Best Configurations",
-        "",
-        f"- **Best by ops/sec:** {best['ops']['value']:.0f} ops/s — `{best['ops']['config']}`",
-        f"- **Best by p99 latency:** {best['latency']['value']:.2f}ms — `{best['latency']['config']}`",
-        f"- **Best by efficiency:** {best['efficiency']['value']:.0f} ops/$/hr — `{best['efficiency']['config']}`",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Best Configurations",
+            "",
+            f"- **Best by ops/sec:** {best['ops']['value']:.0f} ops/s — `{best['ops']['config']}`",
+            f"- **Best by p99 latency:** {best['latency']['value']:.2f}ms — `{best['latency']['config']}`",
+            f"- **Best by efficiency:** {best['efficiency']['value']:.0f} ops/$/hr — `{best['efficiency']['config']}`",
+            "",
+        ]
+    )
 
     output_path.write_text("\n".join(lines))
     print(f"Results exported to {output_path}")
-
 
 
 def results_file(cloud: str) -> Path:

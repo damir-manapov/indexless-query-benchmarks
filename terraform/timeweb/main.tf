@@ -57,11 +57,11 @@ resource "twc_server" "benchmark" {
   ssh_keys_ids = [twc_ssh_key.benchmark.id]
   project_id   = twc_project.benchmark.id
 
-  # Connect to VPC if MinIO or Redis enabled (they share the same VPC subnet)
+  # Connect to VPC if MinIO, Redis, or Postgres enabled (they share the same VPC subnet)
   dynamic "local_network" {
-    for_each = var.minio_enabled || var.redis_enabled ? [1] : []
+    for_each = var.minio_enabled || var.redis_enabled || var.postgres_enabled ? [1] : []
     content {
-      id = var.minio_enabled ? twc_vpc.minio[0].id : twc_vpc.redis[0].id
+      id = var.minio_enabled ? twc_vpc.minio[0].id : (var.redis_enabled ? twc_vpc.redis[0].id : twc_vpc.postgres[0].id)
       ip = "10.0.0.100" # Benchmark VM gets .100 in the VPC
     }
   }
