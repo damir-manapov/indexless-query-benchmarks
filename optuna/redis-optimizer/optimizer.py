@@ -8,6 +8,9 @@ Optimizes Redis single-node and Sentinel configurations.
 Usage:
     uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
     uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
+    uv run python redis-optimizer/optimizer.py --cloud selectel --no-destroy
+    uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
+    uv run python redis-optimizer/optimizer.py --cloud selectel --export-md
 """
 
 import argparse
