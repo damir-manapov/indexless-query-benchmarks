@@ -49,6 +49,66 @@ METRICS = {
 }
 
 
+def show_results(cloud: str) -> None:
+    """Display all benchmark results for a cloud in a table format."""
+    results = load_results(results_file(cloud))
+
+    if not results:
+        print(f"No results found for {cloud}")
+        return
+
+    print(f"\n{'='*100}")
+    print(f"Redis Benchmark Results - {cloud.upper()}")
+    print(f"{'='*100}")
+
+    # Sort by ops_per_sec descending
+    results_sorted = sorted(results, key=lambda x: x.get("ops_per_sec", 0), reverse=True)
+
+    # Header
+    print(
+        f"{'#':>3} {'Mode':<8} {'Nodes':>5} {'CPU':>4} {'RAM':>4} {'Policy':<12} "
+        f"{'IO':>3} {'Persist':<5} {'Ops/s':>10} {'p99ms':>7} {'$/hr':>6} {'Eff':>8}"
+    )
+    print("-" * 100)
+
+    for i, r in enumerate(results_sorted, 1):
+        cfg = r.get("config", {})
+        mode = cfg.get("mode", "?")[:8]
+        nodes = r.get("nodes", 1 if mode == "single" else 3)
+        cpu = cfg.get("cpu_per_node", 0)
+        ram = cfg.get("ram_per_node", 0)
+        policy = cfg.get("maxmemory_policy", "?")[:12]
+        io = cfg.get("io_threads", 0)
+        persist = cfg.get("persistence", "?")[:5]
+        ops = r.get("ops_per_sec", 0)
+        p99 = r.get("p99_latency_ms", 0)
+        cost = r.get("cost_per_hour", 0)
+        eff = r.get("cost_efficiency", 0)
+
+        print(
+            f"{i:>3} {mode:<8} {nodes:>5} {cpu:>4} {ram:>4} {policy:<12} "
+            f"{io:>3} {persist:<5} {ops:>10.0f} {p99:>7.2f} {cost:>6.2f} {eff:>8.0f}"
+        )
+
+    print("-" * 100)
+    print(f"Total: {len(results)} results")
+
+    # Show best by different metrics
+    best_ops = max(results, key=lambda x: x.get("ops_per_sec", 0))
+    best_latency = min(results, key=lambda x: x.get("p99_latency_ms", float("inf")))
+    best_efficiency = max(results, key=lambda x: x.get("cost_efficiency", 0))
+
+    def config_summary(r: dict) -> str:
+        c = r.get("config", {})
+        nodes = r.get("nodes", 1 if c.get("mode") == "single" else 3)
+        return f"{c.get('mode', '?')} {nodes}×{c.get('cpu_per_node', 0)}cpu/{c.get('ram_per_node', 0)}gb io={c.get('io_threads', 0)} {c.get('persistence', '?')}"
+
+    print(f"\nBest by ops/sec:     {best_ops.get('ops_per_sec', 0):>10.0f} ops/s     [{config_summary(best_ops)}]")
+    print(f"Best by p99 latency: {best_latency.get('p99_latency_ms', 0):>10.2f} ms        [{config_summary(best_latency)}]")
+    print(f"Best by efficiency:  {best_efficiency.get('cost_efficiency', 0):>10.0f} ops/$/hr  [{config_summary(best_efficiency)}]")
+
+
+
 def results_file(cloud: str) -> Path:
     """Get results file path for a cloud."""
     return RESULTS_DIR / f"results_{cloud}.json"
@@ -449,13 +509,16 @@ def main():
         epilog="""
 Examples:
   # Optimize for throughput
-  python optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
+  uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric ops_per_sec
 
   # Optimize for latency
-  python optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
+  uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric p99_latency_ms
 
   # Keep infrastructure after optimization
-  python optimizer.py --cloud selectel --trials 10 --no-destroy
+  uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --no-destroy
+
+  # Show all results
+  uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
         """,
     )
     parser.add_argument(
@@ -491,7 +554,17 @@ Examples:
         action="store_true",
         help="Keep infrastructure after optimization",
     )
+    parser.add_argument(
+        "--show-results",
+        action="store_true",
+        help="Show all benchmark results and exit",
+    )
     args = parser.parse_args()
+
+    # Handle --show-results
+    if args.show_results:
+        show_results(args.cloud)
+        return
 
     cloud_config = get_cloud_config(args.cloud)
     study_name = args.study_name or f"redis-{args.cloud}-{args.metric}"

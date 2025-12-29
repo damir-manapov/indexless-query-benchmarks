@@ -46,6 +46,9 @@ uv run python minio-optimizer/optimizer.py --cloud timeweb --trials 10 --no-dest
 
 # Resume a previous study (uses cached results)
 uv run python minio-optimizer/optimizer.py --cloud selectel --trials 20
+
+# Show all benchmark results
+uv run python minio-optimizer/optimizer.py --cloud selectel --show-results
 ```
 
 ### From Scratch (Full Self-Sufficiency Test)

@@ -1,0 +1,98 @@
+[
+  {
+    "trial": 0,
+    "timestamp": "2025-12-29T20:41:40.519536",
+    "cloud": "selectel",
+    "config": {
+      "mode": "sentinel",
+      "cpu_per_node": 2,
+      "ram_per_node": 16,
+      "maxmemory_policy": "allkeys-lru",
+      "io_threads": 1,
+      "persistence": "rdb"
+    },
+    "nodes": 3,
+    "cost_per_hour": 14.850000000000001,
+    "cost_efficiency": 5477.953535353535,
+    "ops_per_sec": 81347.61,
+    "avg_latency_ms": 2.45648,
+    "p50_latency_ms": 2.479,
+    "p99_latency_ms": 3.919,
+    "p999_latency_ms": 5.503,
+    "kb_per_sec": 8174.39,
+    "duration_s": 62.03193426132202,
+    "error": null
+  },
+  {
+    "trial": 2,
+    "timestamp": "2025-12-29T20:48:13.444169",
+    "cloud": "selectel",
+    "config": {
+      "mode": "sentinel",
+      "cpu_per_node": 2,
+      "ram_per_node": 8,
+      "maxmemory_policy": "allkeys-lru",
+      "io_threads": 1,
+      "persistence": "rdb"
+    },
+    "nodes": 3,
+    "cost_per_hour": 10.05,
+    "cost_efficiency": 11700.848756218904,
+    "ops_per_sec": 117593.53,
+    "avg_latency_ms": 1.7004,
+    "p50_latency_ms": 1.671,
+    "p99_latency_ms": 2.687,
+    "p999_latency_ms": 4.095,
+    "kb_per_sec": 10655.85,
+    "duration_s": 61.71349620819092,
+    "error": null
+  },
+  {
+    "trial": 3,
+    "timestamp": "2025-12-29T20:51:32.540489",
+    "cloud": "selectel",
+    "config": {
+      "mode": "single",
+      "cpu_per_node": 2,
+      "ram_per_node": 16,
+      "maxmemory_policy": "allkeys-lru",
+      "io_threads": 2,
+      "persistence": "none"
+    },
+    "nodes": 1,
+    "cost_per_hour": 4.95,
+    "cost_efficiency": 17279.50505050505,
+    "ops_per_sec": 85533.55,
+    "avg_latency_ms": 2.33783,
+    "p50_latency_ms": 2.399,
+    "p99_latency_ms": 3.375,
+    "p999_latency_ms": 4.895,
+    "kb_per_sec": 7748.0,
+    "duration_s": 61.78214144706726,
+    "error": null
+  },
+  {
+    "trial": 4,
+    "timestamp": "2025-12-29T20:55:30.689292",
+    "cloud": "selectel",
+    "config": {
+      "mode": "sentinel",
+      "cpu_per_node": 4,
+      "ram_per_node": 4,
+      "maxmemory_policy": "allkeys-lru",
+      "io_threads": 2,
+      "persistence": "none"
+    },
+    "nodes": 3,
+    "cost_per_hour": 10.649999999999999,
+    "cost_efficiency": 7335.762441314555,
+    "ops_per_sec": 78125.87,
+    "avg_latency_ms": 2.55946,
+    "p50_latency_ms": 2.607,
+    "p99_latency_ms": 3.439,
+    "p999_latency_ms": 5.023,
+    "kb_per_sec": 7076.61,
+    "duration_s": 61.77630949020386,
+    "error": null
+  }
+]

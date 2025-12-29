@@ -54,6 +54,65 @@ METRICS = {
 }
 
 
+def show_results(cloud: str) -> None:
+    """Display all benchmark results for a cloud in a table format."""
+    results = load_results(results_file(cloud))
+
+    if not results:
+        print(f"No results found for {cloud}")
+        return
+
+    print(f"\n{'='*110}")
+    print(f"MinIO Benchmark Results - {cloud.upper()}")
+    print(f"{'='*110}")
+
+    # Sort by total_mib_s descending
+    results_sorted = sorted(results, key=lambda x: x.get("total_mib_s", 0), reverse=True)
+
+    # Header
+    print(
+        f"{'#':>3} {'Nodes':>5} {'CPU':>4} {'RAM':>4} {'Drives':>6} {'Size':>5} {'Type':<8} "
+        f"{'Total':>8} {'GET':>8} {'PUT':>8} {'$/hr':>7} {'Eff':>8}"
+    )
+    print("-" * 110)
+
+    for i, r in enumerate(results_sorted, 1):
+        cfg = r.get("config", {})
+        nodes = cfg.get("nodes", 0)
+        cpu = cfg.get("cpu_per_node", 0)
+        ram = cfg.get("ram_per_node", 0)
+        drives = cfg.get("drives_per_node", 0)
+        size = cfg.get("drive_size_gb", 0)
+        dtype = cfg.get("drive_type", "?")[:8]
+        total = r.get("total_mib_s", 0)
+        get_mib = r.get("get_mib_s", 0)
+        put_mib = r.get("put_mib_s", 0)
+        cost = r.get("cost_per_hour", 0)
+        eff = r.get("cost_efficiency", 0)
+
+        print(
+            f"{i:>3} {nodes:>5} {cpu:>4} {ram:>4} {drives:>6} {size:>5} {dtype:<8} "
+            f"{total:>8.1f} {get_mib:>8.1f} {put_mib:>8.1f} {cost:>7.2f} {eff:>8.1f}"
+        )
+
+    print("-" * 110)
+    print(f"Total: {len(results)} results")
+
+    # Show best by different metrics
+    best_total = max(results, key=lambda x: x.get("total_mib_s", 0))
+    best_get = max(results, key=lambda x: x.get("get_mib_s", 0))
+    best_put = max(results, key=lambda x: x.get("put_mib_s", 0))
+    best_efficiency = max(results, key=lambda x: x.get("cost_efficiency", 0))
+
+    def config_summary(r: dict) -> str:
+        c = r.get("config", {})
+        return f"{c.get('nodes', 0)}n×{c.get('cpu_per_node', 0)}cpu/{c.get('ram_per_node', 0)}gb {c.get('drives_per_node', 0)}×{c.get('drive_size_gb', 0)}gb {c.get('drive_type', '?')}"
+
+    print(f"\nBest by total:      {best_total.get('total_mib_s', 0):>8.1f} MiB/s     [{config_summary(best_total)}]")
+    print(f"Best by GET:        {best_get.get('get_mib_s', 0):>8.1f} MiB/s     [{config_summary(best_get)}]")
+    print(f"Best by PUT:        {best_put.get('put_mib_s', 0):>8.1f} MiB/s     [{config_summary(best_put)}]")
+    print(f"Best by efficiency: {best_efficiency.get('cost_efficiency', 0):>8.1f} MiB/s/$/hr  [{config_summary(best_efficiency)}]")
+
 def get_metric_value(result: dict, metric: str) -> float:
     """Extract the optimization metric value from a result."""
     return result.get(metric, 0)
@@ -858,16 +917,19 @@ def main():
         epilog="""
 Examples:
   # Optimize for throughput (default)
-  python optimizer_multicloud.py --cloud selectel --trials 5
+  uv run python minio-optimizer/optimizer.py --cloud selectel --trials 5
 
   # Optimize for cost efficiency (throughput per dollar)
-  python optimizer_multicloud.py --cloud selectel --trials 5 --metric cost_efficiency
+  uv run python minio-optimizer/optimizer.py --cloud selectel --trials 5 --metric cost_efficiency
 
   # Optimize for read-heavy workloads
-  python optimizer_multicloud.py --cloud timeweb --trials 5 --metric get_mib_s
+  uv run python minio-optimizer/optimizer.py --cloud timeweb --trials 5 --metric get_mib_s
 
   # Keep infrastructure after optimization
-  python optimizer_multicloud.py --cloud timeweb --trials 5 --no-destroy
+  uv run python minio-optimizer/optimizer.py --cloud timeweb --trials 5 --no-destroy
+
+  # Show all results
+  uv run python minio-optimizer/optimizer.py --cloud selectel --show-results
         """,
     )
     parser.add_argument(
@@ -903,7 +965,17 @@ Examples:
         action="store_true",
         help="Keep infrastructure after optimization (default: destroy)",
     )
+    parser.add_argument(
+        "--show-results",
+        action="store_true",
+        help="Show all benchmark results and exit",
+    )
     args = parser.parse_args()
+
+    # Handle --show-results
+    if args.show_results:
+        show_results(args.cloud)
+        return
 
     cloud_config = get_cloud_config(args.cloud)
     study_name = args.study_name or f"minio-{args.cloud}-{args.metric}"

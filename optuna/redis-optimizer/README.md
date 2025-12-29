@@ -39,6 +39,9 @@ uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --metric
 
 # Keep infrastructure after optimization
 uv run python redis-optimizer/optimizer.py --cloud selectel --trials 10 --no-destroy
+
+# Show all benchmark results
+uv run python redis-optimizer/optimizer.py --cloud selectel --show-results
 ```
 
 ### From Scratch
