@@ -6,6 +6,10 @@ terraform {
       source  = "tf.timeweb.cloud/timeweb-cloud/timeweb-cloud"
       version = "~> 1.6"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -16,8 +20,8 @@ provider "twc" {
 
 # Get configurator for the specified location and disk type
 data "twc_configurator" "benchmark" {
-  location  = var.location
-  disk_type = var.disk_type
+  location    = var.location
+  preset_type = var.disk_type == "nvme" ? "premium" : "standard"
 }
 
 # Get Ubuntu 24.04 OS
@@ -70,14 +74,22 @@ resource "twc_server" "benchmark" {
   depends_on = [twc_ssh_key.benchmark]
 }
 
-# Create firewall for the server
+# Firewall with lifecycle to avoid stale link errors
 resource "twc_firewall" "benchmark" {
-  name = "benchmark-firewall"
+  name = "fw-${random_id.firewall_suffix.hex}"
 
   link {
     id   = twc_server.benchmark.id
     type = "server"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "random_id" "firewall_suffix" {
+  byte_length = 4
 }
 
 # SSH access rule
@@ -85,15 +97,6 @@ resource "twc_firewall_rule" "ssh" {
   firewall_id = twc_firewall.benchmark.id
   direction   = "ingress"
   port        = 22
-  protocol    = "tcp"
-  cidr        = "0.0.0.0/0"
-}
-
-# Trino UI access rule
-resource "twc_firewall_rule" "trino" {
-  firewall_id = twc_firewall.benchmark.id
-  direction   = "ingress"
-  port        = 8080
   protocol    = "tcp"
   cidr        = "0.0.0.0/0"
 }

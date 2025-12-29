@@ -57,9 +57,9 @@ locals {
 
 # Get configurator for Redis nodes
 data "twc_configurator" "redis" {
-  count     = var.redis_enabled ? 1 : 0
-  location  = var.location
-  disk_type = "nvme" # Use fast storage for Redis
+  count       = var.redis_enabled ? 1 : 0
+  location    = var.location
+  preset_type = "premium" # Use fast NVMe storage for Redis
 }
 
 # Create VPC for Redis private network (reuse MinIO VPC if exists, otherwise create)
