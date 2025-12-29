@@ -2,6 +2,13 @@
 package_update: true
 package_upgrade: true
 
+apt:
+  sources:
+    pgdg:
+      source: "deb [signed-by=$KEY_FILE] http://apt.postgresql.org/pub/repos/apt $RELEASE-pgdg main"
+      keyid: ACCC4CF8
+      keyserver: keyserver.ubuntu.com
+
 packages:
   - git
   - curl
@@ -15,6 +22,8 @@ packages:
   - pkg-config
   - zlib1g-dev
   - libssl-dev
+  # PostgreSQL (includes pgbench)
+  - postgresql-18
 
 runcmd:
   # Docker

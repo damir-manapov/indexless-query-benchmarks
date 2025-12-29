@@ -198,31 +198,13 @@ resource "openstack_compute_instance_v2" "postgres" {
   depends_on = [openstack_networking_router_interface_v2.benchmark]
 }
 
-# Floating IP for primary Postgres node (for external access)
-resource "openstack_networking_floatingip_v2" "postgres" {
-  count = var.postgres_enabled ? 1 : 0
-
-  pool = data.openstack_networking_network_v2.external.name
-
-  depends_on = [
-    selectel_vpc_project_v2.benchmark,
-    selectel_iam_serviceuser_v1.benchmark
-  ]
-}
-
-resource "openstack_networking_floatingip_associate_v2" "postgres" {
-  count = var.postgres_enabled ? 1 : 0
-
-  floating_ip = openstack_networking_floatingip_v2.postgres[0].address
-  port_id     = openstack_networking_port_v2.postgres[0].id
-
-  depends_on = [openstack_networking_router_interface_v2.benchmark]
-}
+# NOTE: No floating IP for Postgres - access via benchmark VM internal network
+# This saves quota and matches Redis/MinIO pattern
 
 # Outputs
 output "postgres_vm_ip" {
-  description = "Public IP of primary PostgreSQL node"
-  value       = var.postgres_enabled && length(openstack_networking_floatingip_v2.postgres) > 0 ? openstack_networking_floatingip_v2.postgres[0].address : null
+  description = "Private IP of primary PostgreSQL node (access via benchmark VM)"
+  value       = var.postgres_enabled ? "10.0.0.30" : null
 }
 
 output "postgres_endpoints" {
@@ -236,8 +218,8 @@ output "postgres_primary" {
 }
 
 output "postgres_connection" {
-  description = "PostgreSQL connection string (public)"
-  value       = var.postgres_enabled && length(openstack_networking_floatingip_v2.postgres) > 0 ? "postgresql://postgres@${openstack_networking_floatingip_v2.postgres[0].address}:5432/postgres" : null
+  description = "PostgreSQL connection string (via benchmark VM)"
+  value       = var.postgres_enabled ? "postgresql://postgres@10.0.0.30:5432/postgres" : null
 }
 
 output "postgres_config" {
