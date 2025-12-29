@@ -136,10 +136,10 @@ def show_results(cloud: str) -> None:
     print(f"Total: {len(data['rows'])} results")
 
     best = data["best"]
-    print(f"\nBest by total:      {best['total']['value']:>8.1f} MiB/s     [{best['total']['config']}]")
-    print(f"Best by GET:        {best['get']['value']:>8.1f} MiB/s     [{best['get']['config']}]")
-    print(f"Best by PUT:        {best['put']['value']:>8.1f} MiB/s     [{best['put']['config']}]")
-    print(f"Best by efficiency: {best['efficiency']['value']:>8.1f} MiB/s/$/hr  [{best['efficiency']['config']}]")
+    print(f"\nBest by total:      {best['total']['value']:>8.1f} {'MiB/s':<11} [{best['total']['config']}]")
+    print(f"Best by GET:        {best['get']['value']:>8.1f} {'MiB/s':<11} [{best['get']['config']}]")
+    print(f"Best by PUT:        {best['put']['value']:>8.1f} {'MiB/s':<11} [{best['put']['config']}]")
+    print(f"Best by efficiency: {best['efficiency']['value']:>8.1f} {'MiB/s/$/hr':<11} [{best['efficiency']['config']}]")
 
 
 def export_results_md(cloud: str, output_path: Path | None = None) -> None:

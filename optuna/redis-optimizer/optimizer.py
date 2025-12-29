@@ -132,9 +132,9 @@ def show_results(cloud: str) -> None:
     print(f"Total: {len(data['rows'])} results")
 
     best = data["best"]
-    print(f"\nBest by ops/sec:     {best['ops']['value']:>10.0f} ops/s     [{best['ops']['config']}]")
-    print(f"Best by p99 latency: {best['latency']['value']:>10.2f} ms        [{best['latency']['config']}]")
-    print(f"Best by efficiency:  {best['efficiency']['value']:>10.0f} ops/$/hr  [{best['efficiency']['config']}]")
+    print(f"\nBest by ops/sec:     {best['ops']['value']:>10.0f} {'ops/s':<9} [{best['ops']['config']}]")
+    print(f"Best by p99 latency: {best['latency']['value']:>10.2f} {'ms':<9} [{best['latency']['config']}]")
+    print(f"Best by efficiency:  {best['efficiency']['value']:>10.0f} {'ops/$/hr':<9} [{best['efficiency']['config']}]")
 
 
 def export_results_md(cloud: str, output_path: Path | None = None) -> None:
