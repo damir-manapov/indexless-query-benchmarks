@@ -1,13 +1,6 @@
 #cloud-config
-package_update: true
-package_upgrade: true
-
-apt:
-  sources:
-    pgdg:
-      source: "deb [signed-by=$KEY_FILE] http://apt.postgresql.org/pub/repos/apt $RELEASE-pgdg main"
-      keyid: ACCC4CF8
-      keyserver: keyserver.ubuntu.com
+package_update: false
+package_upgrade: false
 
 packages:
   - git
@@ -28,6 +21,10 @@ packages:
 # Add SSH key via cloud-init (workaround for Timeweb SSH key issues)
 ssh_authorized_keys:
   - ${ssh_public_key}
+
+# Setup PGDG repo before apt runs
+bootcmd:
+  - 'test -f /etc/apt/sources.list.d/pgdg.sources || (curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && printf "Types: deb\nURIs: http://apt.postgresql.org/pub/repos/apt\nSuites: noble-pgdg\nComponents: main\nSigned-By: /usr/share/keyrings/pgdg.gpg\n" > /etc/apt/sources.list.d/pgdg.sources && apt-get update)'
 
 runcmd:
   # Docker
