@@ -721,6 +721,10 @@ Examples:
         except ValueError:
             print("No successful trials completed")
 
+        # Auto-export results to markdown
+        export_results_md(args.cloud)
+        print(f"\nResults exported to RESULTS_{args.cloud.upper()}.md")
+
     finally:
         if not args.no_destroy:
             destroy_all(cloud_config.terraform_dir, cloud_config.name)

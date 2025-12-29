@@ -1133,6 +1133,10 @@ Examples:
         except ValueError:
             print("No successful trials completed")
 
+        # Auto-export results to markdown
+        export_results_md(args.cloud)
+        print(f"\nResults exported to RESULTS_{args.cloud.upper()}.md")
+
     finally:
         # Cleanup
         if not args.no_destroy:
