@@ -6,9 +6,9 @@ Supports both Selectel and Timeweb Cloud providers.
 Automatically creates benchmark VM if not provided.
 
 Usage:
-    python optimizer.py --cloud timeweb --trials 5
-    python optimizer.py --cloud selectel --trials 10 --no-destroy
-    python optimizer.py --cloud timeweb --benchmark-vm-ip 1.2.3.4 --trials 10
+    uv run python minio-optimizer/optimizer.py --cloud timeweb --trials 5
+    uv run python minio-optimizer/optimizer.py --cloud selectel --trials 10 --no-destroy
+    uv run python minio-optimizer/optimizer.py --cloud timeweb --benchmark-vm-ip 1.2.3.4 --trials 10
 """
 
 import argparse
