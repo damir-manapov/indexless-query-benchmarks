@@ -7,6 +7,14 @@ packages:
   - curl
   - fio
   - build-essential
+  # memtier_benchmark build deps
+  - autoconf
+  - automake
+  - libpcre3-dev
+  - libevent-dev
+  - pkg-config
+  - zlib1g-dev
+  - libssl-dev
 
 # Add SSH key via cloud-init (workaround for Timeweb SSH key issues)
 ssh_authorized_keys:
@@ -19,6 +27,10 @@ runcmd:
   # Install warp (MinIO benchmark tool)
   - curl -L https://github.com/minio/warp/releases/download/v1.0.8/warp_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin/ warp
   - chmod +x /usr/local/bin/warp
+
+  # Install memtier_benchmark (Redis benchmark tool)
+  - cd /tmp && git clone https://github.com/RedisLabs/memtier_benchmark.git
+  - cd /tmp/memtier_benchmark && autoreconf -ivf && ./configure && make -j$(nproc) && make install
 
   # Node.js via NodeSource (more reliable than NVM in cloud-init)
   - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
