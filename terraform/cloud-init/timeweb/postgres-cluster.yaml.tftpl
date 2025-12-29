@@ -1,0 +1,201 @@
+#cloud-config
+# PostgreSQL Cluster Node - Timeweb (Patroni + etcd)
+# Node ${node_index + 1} of ${node_count}
+package_update: true
+package_upgrade: true
+
+packages:
+  - gnupg
+  - lsb-release
+  - curl
+  - python3-pip
+  - python3-psycopg2
+
+# Add SSH key via cloud-init (workaround for Timeweb SSH key issues)
+ssh_authorized_keys:
+  - ${ssh_public_key}
+
+write_files:
+  # etcd configuration
+  - path: /etc/default/etcd
+    content: |
+      ETCD_NAME="node${node_index}"
+      ETCD_DATA_DIR="/var/lib/etcd/default"
+      ETCD_LISTEN_PEER_URLS="http://10.0.0.${30 + node_index}:2380"
+      ETCD_LISTEN_CLIENT_URLS="http://10.0.0.${30 + node_index}:2379,http://127.0.0.1:2379"
+      ETCD_INITIAL_ADVERTISE_PEER_URLS="http://10.0.0.${30 + node_index}:2380"
+      ETCD_ADVERTISE_CLIENT_URLS="http://10.0.0.${30 + node_index}:2379"
+      ETCD_INITIAL_CLUSTER="node0=http://10.0.0.30:2380,node1=http://10.0.0.31:2380,node2=http://10.0.0.32:2380"
+      ETCD_INITIAL_CLUSTER_STATE="new"
+      ETCD_INITIAL_CLUSTER_TOKEN="pg-cluster-token"
+
+  # Patroni configuration
+  - path: /etc/patroni/patroni.yml
+    content: |
+      scope: postgres-cluster
+      name: node${node_index}
+
+      restapi:
+        listen: 0.0.0.0:8008
+        connect_address: 10.0.0.${30 + node_index}:8008
+
+      etcd3:
+        hosts:
+          - 10.0.0.30:2379
+          - 10.0.0.31:2379
+          - 10.0.0.32:2379
+
+      bootstrap:
+        dcs:
+          ttl: 30
+          loop_wait: 10
+          retry_timeout: 10
+          maximum_lag_on_failover: 1048576
+          postgresql:
+            use_pg_rewind: true
+            use_slots: true
+            parameters:
+              wal_level: replica
+              hot_standby: "on"
+              max_connections: 200
+              max_wal_senders: 10
+              max_replication_slots: 10
+              wal_keep_size: 1GB
+              listen_addresses: '*'
+              shared_buffers: 4GB
+              effective_cache_size: 12GB
+              work_mem: 64MB
+              maintenance_work_mem: 512MB
+
+        initdb:
+          - encoding: UTF8
+          - data-checksums
+
+        pg_hba:
+          - host replication replicator 10.0.0.0/24 md5
+          - host all all 0.0.0.0/0 trust
+          - host all all ::/0 trust
+
+      postgresql:
+        listen: 0.0.0.0:5432
+        connect_address: 10.0.0.${30 + node_index}:5432
+        data_dir: /var/lib/postgresql/18/patroni
+        bin_dir: /usr/lib/postgresql/18/bin
+        pgpass: /var/lib/postgresql/.pgpass
+        authentication:
+          replication:
+            username: replicator
+            password: replicator
+          superuser:
+            username: postgres
+            password: postgres
+        parameters:
+          unix_socket_directories: '/var/run/postgresql'
+
+      tags:
+        nofailover: false
+        noloadbalance: false
+        clonefrom: false
+        nosync: false
+
+  # Patroni systemd service
+  - path: /etc/systemd/system/patroni.service
+    content: |
+      [Unit]
+      Description=Patroni PostgreSQL Cluster Manager
+      After=network.target etcd.service
+      Wants=etcd.service
+
+      [Service]
+      Type=simple
+      User=postgres
+      Group=postgres
+      ExecStart=/usr/local/bin/patroni /etc/patroni/patroni.yml
+      ExecReload=/bin/kill -HUP $MAINPID
+      KillMode=process
+      TimeoutSec=30
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # Add hostnames for cluster nodes
+%{ for i in range(node_count) ~}
+  - echo '10.0.0.${30 + i} pg${i + 1}' >> /etc/hosts
+%{ endfor ~}
+
+  # Install etcd (not in Ubuntu 24.04 repos)
+  - curl -fsSL https://github.com/etcd-io/etcd/releases/download/v3.5.17/etcd-v3.5.17-linux-amd64.tar.gz | tar xz -C /tmp
+  - mv /tmp/etcd-v3.5.17-linux-amd64/etcd /usr/local/bin/
+  - mv /tmp/etcd-v3.5.17-linux-amd64/etcdctl /usr/local/bin/
+  - chmod +x /usr/local/bin/etcd /usr/local/bin/etcdctl
+  - mkdir -p /var/lib/etcd
+  - useradd --system --no-create-home --shell /bin/false etcd || true
+  - chown -R etcd:etcd /var/lib/etcd
+
+  # Create etcd systemd service
+  - |
+    cat > /etc/systemd/system/etcd.service << 'EOF'
+    [Unit]
+    Description=etcd distributed key-value store
+    After=network.target
+
+    [Service]
+    Type=notify
+    User=etcd
+    EnvironmentFile=/etc/default/etcd
+    ExecStart=/usr/local/bin/etcd
+    Restart=always
+    RestartSec=5
+    LimitNOFILE=65536
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+
+  # PostgreSQL 18 (official PGDG repo)
+  - curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+  - apt-get update
+  - apt-get install -y postgresql-18 postgresql-contrib-18
+
+  # Stop default PostgreSQL service (Patroni will manage it)
+  - systemctl stop postgresql
+  - systemctl disable postgresql
+
+  # Install Patroni
+  - pip3 install --break-system-packages patroni[etcd3] psycopg2-binary
+
+  # Create Patroni directories
+  - mkdir -p /etc/patroni
+  - mkdir -p /var/lib/postgresql/18/patroni
+  - chown -R postgres:postgres /etc/patroni
+  - chown -R postgres:postgres /var/lib/postgresql/18/patroni
+  - chmod 700 /var/lib/postgresql/18/patroni
+
+  # Start etcd
+  - systemctl daemon-reload
+  - systemctl enable etcd
+  - systemctl start etcd
+
+  # Wait for etcd cluster to form
+%{ if node_index == 0 ~}
+  - sleep 15
+  - /usr/local/bin/etcdctl endpoint health || true
+%{ else ~}
+  - sleep 20
+%{ endif ~}
+
+  # Start Patroni
+  - systemctl enable patroni
+  - systemctl start patroni
+
+  # Wait for Patroni to initialize
+  - sleep 30
+
+  # Create ready marker
+  - touch /root/postgres-ready
+
+final_message: "PostgreSQL Cluster Node ${node_index + 1} ready after $UPTIME seconds"

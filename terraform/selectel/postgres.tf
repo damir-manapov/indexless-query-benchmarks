@@ -150,17 +150,14 @@ resource "openstack_networking_port_v2" "postgres" {
   ]
 }
 
-# Cloud-init templates
+# Cloud-init templates (Selectel - no ssh_authorized_keys needed)
 locals {
-  postgres_single_cloud_init = templatefile("${path.module}/../postgres-cloud-init.yaml.tftpl", {
-    ssh_public_key = file(var.ssh_public_key_path)
-  })
-
-  postgres_cluster_cloud_init = [
-    for i in range(3) : templatefile("${path.module}/../postgres-cluster-cloud-init.yaml.tftpl", {
-      ssh_public_key = file(var.ssh_public_key_path)
-      node_index     = i
-      node_count     = 3
+  postgres_cloud_init = var.postgres_mode == "single" ? [
+    templatefile("${path.module}/../cloud-init/selectel/postgres-single.yaml.tftpl", {})
+  ] : [
+    for i in range(3) : templatefile("${path.module}/../cloud-init/selectel/postgres-cluster.yaml.tftpl", {
+      node_index = i
+      node_count = 3
     })
   ]
 }
@@ -173,7 +170,7 @@ resource "openstack_compute_instance_v2" "postgres" {
   flavor_id         = openstack_compute_flavor_v2.postgres[0].id
   key_pair          = selectel_vpc_keypair_v2.benchmark.name
   availability_zone = var.availability_zone
-  user_data         = var.postgres_mode == "single" ? local.postgres_single_cloud_init : local.postgres_cluster_cloud_init[count.index]
+  user_data         = local.postgres_cloud_init[count.index]
 
   network {
     port = openstack_networking_port_v2.postgres[count.index].id

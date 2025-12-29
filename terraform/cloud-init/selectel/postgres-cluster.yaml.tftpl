@@ -1,7 +1,6 @@
 #cloud-config
-# PostgreSQL Cluster (Patroni) Node ${node_index + 1} of ${node_count}
-# Uses etcd for distributed consensus and Patroni for HA management
-
+# PostgreSQL Cluster Node - Selectel (Patroni + etcd)
+# Node ${node_index + 1} of ${node_count}
 package_update: true
 package_upgrade: true
 
@@ -9,12 +8,8 @@ packages:
   - gnupg
   - lsb-release
   - curl
-  - etcd
   - python3-pip
   - python3-psycopg2
-
-ssh_authorized_keys:
-  - ${ssh_public_key}
 
 write_files:
   # etcd configuration
@@ -63,7 +58,6 @@ write_files:
               max_replication_slots: 10
               wal_keep_size: 1GB
               listen_addresses: '*'
-              # Tuning (will be overwritten by optimizer)
               shared_buffers: 4GB
               effective_cache_size: 12GB
               work_mem: 64MB
@@ -78,23 +72,12 @@ write_files:
           - host all all 0.0.0.0/0 trust
           - host all all ::/0 trust
 
-        users:
-          admin:
-            password: admin
-            options:
-              - createrole
-              - createdb
-          replicator:
-            password: replicator
-            options:
-              - replication
-
       postgresql:
         listen: 0.0.0.0:5432
         connect_address: 10.0.0.${30 + node_index}:5432
         data_dir: /var/lib/postgresql/18/patroni
         bin_dir: /usr/lib/postgresql/18/bin
-        pgpass: /tmp/pgpass
+        pgpass: /var/lib/postgresql/.pgpass
         authentication:
           replication:
             username: replicator
@@ -139,6 +122,35 @@ runcmd:
   - echo '10.0.0.${30 + i} pg${i + 1}' >> /etc/hosts
 %{ endfor ~}
 
+  # Install etcd (not in Ubuntu 24.04 repos)
+  - curl -fsSL https://github.com/etcd-io/etcd/releases/download/v3.5.17/etcd-v3.5.17-linux-amd64.tar.gz | tar xz -C /tmp
+  - mv /tmp/etcd-v3.5.17-linux-amd64/etcd /usr/local/bin/
+  - mv /tmp/etcd-v3.5.17-linux-amd64/etcdctl /usr/local/bin/
+  - chmod +x /usr/local/bin/etcd /usr/local/bin/etcdctl
+  - mkdir -p /var/lib/etcd
+  - useradd --system --no-create-home --shell /bin/false etcd || true
+  - chown -R etcd:etcd /var/lib/etcd
+
+  # Create etcd systemd service
+  - |
+    cat > /etc/systemd/system/etcd.service << 'EOF'
+    [Unit]
+    Description=etcd distributed key-value store
+    After=network.target
+
+    [Service]
+    Type=notify
+    User=etcd
+    EnvironmentFile=/etc/default/etcd
+    ExecStart=/usr/local/bin/etcd
+    Restart=always
+    RestartSec=5
+    LimitNOFILE=65536
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+
   # PostgreSQL 18 (official PGDG repo)
   - curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
   - echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
@@ -164,10 +176,10 @@ runcmd:
   - systemctl enable etcd
   - systemctl start etcd
 
-  # Wait for etcd cluster to form (only on node 0)
+  # Wait for etcd cluster to form
 %{ if node_index == 0 ~}
   - sleep 15
-  - etcdctl endpoint health || true
+  - /usr/local/bin/etcdctl endpoint health || true
 %{ else ~}
   - sleep 20
 %{ endif ~}

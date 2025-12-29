@@ -78,7 +78,8 @@ locals {
 
 # Cloud-init for single mode
 locals {
-  redis_single_cloud_init = templatefile("${path.module}/../redis-single-cloud-init.yaml", {
+  redis_single_cloud_init = templatefile("${path.module}/../cloud-init/timeweb/redis-single.yaml.tftpl", {
+    ssh_public_key   = file(var.ssh_public_key_path)
     maxmemory_mb     = local.redis_maxmemory_mb
     maxmemory_policy = var.redis_maxmemory_policy
     io_threads       = var.redis_io_threads
@@ -86,7 +87,8 @@ locals {
   })
 
   redis_sentinel_cloud_init = [
-    for i in range(3) : templatefile("${path.module}/../redis-sentinel-cloud-init.yaml", {
+    for i in range(3) : templatefile("${path.module}/../cloud-init/timeweb/redis-sentinel.yaml.tftpl", {
+      ssh_public_key   = file(var.ssh_public_key_path)
       node_index       = i
       node_count       = 3
       maxmemory_mb     = local.redis_maxmemory_mb

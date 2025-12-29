@@ -1,0 +1,38 @@
+#cloud-config
+# PostgreSQL Single Node - Timeweb
+package_update: true
+package_upgrade: true
+
+packages:
+  - gnupg
+  - lsb-release
+  - curl
+
+# Add SSH key via cloud-init (workaround for Timeweb SSH key issues)
+ssh_authorized_keys:
+  - ${ssh_public_key}
+
+runcmd:
+  # PostgreSQL 18 (official PGDG repo)
+  - curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+  - apt-get update
+  - apt-get install -y postgresql-18 postgresql-contrib-18
+
+  # Configure Postgres to listen on all interfaces
+  - sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/18/main/postgresql.conf
+  - echo "host all all 0.0.0.0/0 trust" >> /etc/postgresql/18/main/pg_hba.conf
+  - echo "host all all ::/0 trust" >> /etc/postgresql/18/main/pg_hba.conf
+
+  # Create tuning config directory
+  - mkdir -p /etc/postgresql/18/main/conf.d
+  - echo "include_dir = 'conf.d'" >> /etc/postgresql/18/main/postgresql.conf
+
+  # Restart Postgres to apply config
+  - systemctl restart postgresql
+  - systemctl enable postgresql
+
+  # Create ready marker
+  - touch /root/postgres-ready
+
+final_message: "PostgreSQL Single Node ready after $UPTIME seconds"

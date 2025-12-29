@@ -1,15 +1,18 @@
 #cloud-config
+# Redis Single Node - Timeweb
 package_update: true
 
 packages:
   - redis-server
-  - redis-sentinel
   - redis-tools
   - fio
   - sysbench
 
+# Add SSH key via cloud-init (workaround for Timeweb SSH key issues)
+ssh_authorized_keys:
+  - ${ssh_public_key}
+
 write_files:
-  # Redis configuration
   - path: /etc/redis/redis.conf
     content: |
       bind 0.0.0.0
@@ -17,13 +20,6 @@ write_files:
       protected-mode no
       daemonize no
       supervised systemd
-
-      # Replication
-%{ if node_index == 0 ~}
-      # Master node - no replicaof
-%{ else ~}
-      replicaof 10.0.0.20 6379
-%{ endif ~}
 
       # Memory
       maxmemory ${maxmemory_mb}mb
@@ -55,28 +51,7 @@ write_files:
       loglevel notice
       logfile /var/log/redis/redis-server.log
 
-  # Sentinel configuration
-  - path: /etc/redis/sentinel.conf
-    content: |
-      bind 0.0.0.0
-      port 26379
-      protected-mode no
-      daemonize no
-      supervised systemd
-
-      sentinel monitor mymaster 10.0.0.20 6379 2
-      sentinel down-after-milliseconds mymaster 5000
-      sentinel failover-timeout mymaster 60000
-      sentinel parallel-syncs mymaster 1
-
-      logfile /var/log/redis/redis-sentinel.log
-
 runcmd:
-  # Add hostnames for Redis cluster
-%{ for i in range(node_count) ~}
-  - echo '10.0.0.${20 + i} redis${i + 1}' >> /etc/hosts
-%{ endfor ~}
-
   # Create log directory
   - mkdir -p /var/log/redis
   - chown redis:redis /var/log/redis
@@ -90,17 +65,11 @@ runcmd:
   - systemctl restart redis-server
   - systemctl enable redis-server
 
-  # Wait for Redis to be ready before starting Sentinel
-  - sleep 10
-
-  # Start Sentinel
-  - systemctl restart redis-sentinel
-  - systemctl enable redis-sentinel
-
-  # Wait for everything to settle
+  # Wait for Redis to be ready
   - sleep 5
+  - redis-cli ping
 
   # Create ready marker
   - touch /root/redis-ready
 
-final_message: "Redis Sentinel node ${node_index + 1} ready after $UPTIME seconds"
+final_message: "Redis single node ready after $UPTIME seconds"

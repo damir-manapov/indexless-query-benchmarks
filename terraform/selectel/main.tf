@@ -185,7 +185,7 @@ resource "openstack_compute_instance_v2" "benchmark" {
   flavor_id         = openstack_compute_flavor_v2.benchmark.id
   key_pair          = selectel_vpc_keypair_v2.benchmark.name
   availability_zone = var.availability_zone
-  user_data         = file("${path.module}/../benchmark-cloud-init.yaml")
+  user_data         = templatefile("${path.module}/../cloud-init/selectel/benchmark.yaml.tftpl", {})
 
   network {
     port = openstack_networking_port_v2.benchmark.id

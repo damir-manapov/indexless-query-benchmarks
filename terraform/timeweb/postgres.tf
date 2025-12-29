@@ -72,15 +72,14 @@ locals {
   ) : null
 }
 
-# Cloud-init templates
+# Cloud-init templates (Timeweb uses .yaml.tftpl with ssh_authorized_keys)
 locals {
-  postgres_single_cloud_init = templatefile("${path.module}/../postgres-cloud-init.yaml.tftpl", {
-    ssh_public_key = file(var.ssh_public_key_path)
-  })
-
-  # Cluster mode cloud-init (Patroni) - for future use
-  postgres_cluster_cloud_init = [
-    for i in range(3) : templatefile("${path.module}/../postgres-cluster-cloud-init.yaml.tftpl", {
+  postgres_cloud_init = var.postgres_mode == "single" ? [
+    templatefile("${path.module}/../cloud-init/timeweb/postgres-single.yaml.tftpl", {
+      ssh_public_key = file(var.ssh_public_key_path)
+    })
+  ] : [
+    for i in range(3) : templatefile("${path.module}/../cloud-init/timeweb/postgres-cluster.yaml.tftpl", {
       ssh_public_key = file(var.ssh_public_key_path)
       node_index     = i
       node_count     = 3
@@ -111,7 +110,7 @@ resource "twc_server" "postgres" {
     ip = "10.0.0.${30 + count.index}"
   }
 
-  cloud_init = var.postgres_mode == "single" ? local.postgres_single_cloud_init : local.postgres_cluster_cloud_init[count.index]
+  cloud_init = local.postgres_cloud_init[count.index]
 
   depends_on = [twc_ssh_key.benchmark, twc_vpc.postgres, twc_vpc.redis, twc_vpc.minio]
 }

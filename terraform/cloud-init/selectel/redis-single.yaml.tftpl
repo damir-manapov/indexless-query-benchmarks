@@ -1,0 +1,71 @@
+#cloud-config
+# Redis Single Node - Selectel
+package_update: true
+
+packages:
+  - redis-server
+  - redis-tools
+  - fio
+  - sysbench
+
+write_files:
+  - path: /etc/redis/redis.conf
+    content: |
+      bind 0.0.0.0
+      port 6379
+      protected-mode no
+      daemonize no
+      supervised systemd
+
+      # Memory
+      maxmemory ${maxmemory_mb}mb
+      maxmemory-policy ${maxmemory_policy}
+
+      # Persistence
+      dir /var/lib/redis
+      stop-writes-on-bgsave-error no
+%{ if persistence == "none" ~}
+      save ""
+      appendonly no
+%{ endif ~}
+%{ if persistence == "rdb" ~}
+      save 900 1
+      save 300 10
+      save 60 10000
+      appendonly no
+%{ endif ~}
+
+      # Performance
+      io-threads ${io_threads}
+      io-threads-do-reads yes
+
+      # Networking
+      tcp-backlog 511
+      tcp-keepalive 300
+
+      # Logging
+      loglevel notice
+      logfile /var/log/redis/redis-server.log
+
+runcmd:
+  # Create log directory
+  - mkdir -p /var/log/redis
+  - chown redis:redis /var/log/redis
+
+  # Optimize kernel settings for Redis
+  - sysctl -w vm.overcommit_memory=1
+  - sysctl -w net.core.somaxconn=65535
+  - echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+  # Restart Redis with new config
+  - systemctl restart redis-server
+  - systemctl enable redis-server
+
+  # Wait for Redis to be ready
+  - sleep 5
+  - redis-cli ping
+
+  # Create ready marker
+  - touch /root/redis-ready
+
+final_message: "Redis single node ready after $UPTIME seconds"
