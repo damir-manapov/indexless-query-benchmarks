@@ -413,27 +413,15 @@ def objective(
     # Deploy Redis
     success, deploy_time = deploy_redis(config, cloud_config, vm_ip)
     if not success:
-        save_result(
-            BenchmarkResult(config=config, error="Deploy failed"),
-            config,
-            trial.number,
-            cloud,
-            cloud_config,
-        )
-        return 0.0 if metric != "p99_latency_ms" else -float("inf")
+        print("  Deploy failed - marking trial as pruned (will retry config later)")
+        raise optuna.TrialPruned("Deploy failed")
 
     # Run benchmark
     result = run_memtier_benchmark(vm_ip)
 
     if result is None or result.ops_per_sec == 0:
-        save_result(
-            BenchmarkResult(config=config, error="Benchmark failed"),
-            config,
-            trial.number,
-            cloud,
-            cloud_config,
-        )
-        return 0.0 if metric != "p99_latency_ms" else -float("inf")
+        print("  Benchmark failed - marking trial as pruned (will retry config later)")
+        raise optuna.TrialPruned("Benchmark failed")
 
     result.config = config
     save_result(result, config, trial.number, cloud, cloud_config)
