@@ -1,0 +1,71 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - jq
+
+write_files:
+  - path: /etc/meilisearch.env
+    content: |
+      MEILI_ENV=production
+      MEILI_HTTP_ADDR=0.0.0.0:7700
+      MEILI_MASTER_KEY=${master_key}
+      MEILI_NO_ANALYTICS=true
+      MEILI_LOG_LEVEL=INFO
+      MEILI_MAX_INDEXING_MEMORY=${max_indexing_memory}
+      MEILI_MAX_INDEXING_THREADS=${max_indexing_threads}
+    permissions: '0600'
+
+  - path: /etc/systemd/system/meilisearch.service
+    content: |
+      [Unit]
+      Description=Meilisearch
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=meilisearch
+      Group=meilisearch
+      EnvironmentFile=/etc/meilisearch.env
+      ExecStart=/usr/local/bin/meilisearch
+      WorkingDirectory=/var/lib/meilisearch
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: '0644'
+
+runcmd:
+  # Create meilisearch user
+  - useradd -r -s /bin/false meilisearch
+
+  # Create data directory
+  - mkdir -p /var/lib/meilisearch
+  - chown meilisearch:meilisearch /var/lib/meilisearch
+
+  # Download and install Meilisearch
+  - curl -L https://install.meilisearch.com | sh
+  - mv ./meilisearch /usr/local/bin/
+  - chmod +x /usr/local/bin/meilisearch
+
+  # Start Meilisearch
+  - systemctl daemon-reload
+  - systemctl enable meilisearch
+  - systemctl start meilisearch
+
+  # Wait for Meilisearch to be ready
+  - |
+    for i in {1..30}; do
+      if curl -sf http://localhost:7700/health > /dev/null 2>&1; then
+        echo "Meilisearch is ready"
+        break
+      fi
+      echo "Waiting for Meilisearch... ($i/30)"
+      sleep 2
+    done
+
+  # Signal ready
+  - touch /root/meilisearch-ready

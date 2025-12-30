@@ -1,0 +1,72 @@
+[
+  {
+    "trial": 24,
+    "timestamp": "2025-12-30T10:43:44.771591",
+    "cloud": "selectel",
+    "mode": "infra",
+    "infra_config": {
+      "mode": "cluster",
+      "cpu": 2,
+      "ram_gb": 8,
+      "disk_type": "fast",
+      "disk_size_gb": 50
+    },
+    "pg_config": {
+      "shared_buffers_pct": 25,
+      "effective_cache_size_pct": 75,
+      "work_mem_mb": 64,
+      "maintenance_work_mem_mb": 256,
+      "max_connections": 100,
+      "random_page_cost": 1.1,
+      "effective_io_concurrency": 200,
+      "wal_buffers_mb": 64,
+      "max_wal_size_gb": 2,
+      "checkpoint_completion_target": 0.9,
+      "max_worker_processes": 2,
+      "max_parallel_workers_per_gather": 1
+    },
+    "cost_per_hour": 3.35,
+    "cost_efficiency": 581.6400435820896,
+    "tps": 1948.494146,
+    "latency_avg_ms": 4.103,
+    "latency_stddev_ms": 1.425,
+    "transactions": 116895,
+    "duration_s": 62.508410692214966,
+    "error": null
+  },
+  {
+    "trial": 25,
+    "timestamp": "2025-12-30T10:55:29.711087",
+    "cloud": "selectel",
+    "mode": "infra",
+    "infra_config": {
+      "mode": "single",
+      "cpu": 2,
+      "ram_gb": 8,
+      "disk_type": "fast",
+      "disk_size_gb": 50
+    },
+    "pg_config": {
+      "shared_buffers_pct": 25,
+      "effective_cache_size_pct": 75,
+      "work_mem_mb": 64,
+      "maintenance_work_mem_mb": 256,
+      "max_connections": 100,
+      "random_page_cost": 1.1,
+      "effective_io_concurrency": 200,
+      "wal_buffers_mb": 64,
+      "max_wal_size_gb": 2,
+      "checkpoint_completion_target": 0.9,
+      "max_worker_processes": 2,
+      "max_parallel_workers_per_gather": 1
+    },
+    "cost_per_hour": 3.35,
+    "cost_efficiency": 593.2790671641791,
+    "tps": 1987.484875,
+    "latency_avg_ms": 4.022,
+    "latency_stddev_ms": 1.332,
+    "transactions": 119219,
+    "duration_s": 61.671369552612305,
+    "error": null
+  }
+]
