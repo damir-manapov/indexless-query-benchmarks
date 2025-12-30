@@ -10,7 +10,11 @@ from python_terraform import Terraform
 
 
 def run_ssh_command(
-    vm_ip: str, command: str, timeout: int = 300, forward_agent: bool = False
+    vm_ip: str,
+    command: str,
+    timeout: int = 300,
+    forward_agent: bool = False,
+    jump_host: str | None = None,
 ) -> tuple[int, str]:
     """Run command on remote VM via SSH.
 
@@ -19,16 +23,23 @@ def run_ssh_command(
         command: Command to run on VM
         timeout: Command timeout in seconds
         forward_agent: If True, forward SSH agent for nested SSH connections
+        jump_host: If set, use this host as SSH jump/proxy host (for internal IPs)
     """
     ssh_args = [
         "ssh",
         "-o",
         "StrictHostKeyChecking=no",
         "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
         "ConnectTimeout=10",
     ]
     if forward_agent:
         ssh_args.append("-A")
+    if jump_host:
+        # Use ProxyCommand instead of -J to pass SSH options to jump host too
+        proxy_cmd = f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p root@{jump_host}"
+        ssh_args.extend(["-o", f"ProxyCommand={proxy_cmd}"])
     ssh_args.extend([f"root@{vm_ip}", command])
 
     result = subprocess.run(
@@ -40,7 +51,9 @@ def run_ssh_command(
     return result.returncode, result.stdout + result.stderr
 
 
-def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
+def wait_for_vm_ready(
+    vm_ip: str, timeout: int = 300, jump_host: str | None = None
+) -> bool:
     """Wait for benchmark VM to be ready (cloud-init complete)."""
     print(f"  Waiting for VM {vm_ip} to be ready...")
 
@@ -48,7 +61,7 @@ def wait_for_vm_ready(vm_ip: str, timeout: int = 300) -> bool:
     while time.time() - start < timeout:
         try:
             code, _ = run_ssh_command(
-                vm_ip, "test -f /root/benchmark-ready", timeout=15
+                vm_ip, "test -f /root/benchmark-ready", timeout=15, jump_host=jump_host
             )
             if code == 0:
                 print("  VM is ready!")

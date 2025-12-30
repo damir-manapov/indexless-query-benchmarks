@@ -164,31 +164,45 @@ max_parallel_workers = {pg_config["max_worker_processes"]}
 
 
 def reconfigure_postgres(
-    vm_ip: str, pg_config: dict, ram_gb: int, mode: str = "single"
+    vm_ip: str,
+    pg_config: dict,
+    ram_gb: int,
+    mode: str = "single",
+    jump_host: str | None = None,
 ) -> bool:
-    """Reconfigure Postgres with new settings (no VM recreation)."""
+    """Reconfigure Postgres with new settings (no VM recreation).
+    
+    Args:
+        vm_ip: Postgres VM IP (internal)
+        pg_config: PostgreSQL configuration parameters
+        ram_gb: RAM in GB for the VM
+        mode: 'single' or 'cluster'
+        jump_host: Benchmark VM IP to use as SSH jump host (for internal IPs)
+    """
     print(f"  Reconfiguring Postgres ({mode} mode) with: {pg_config}")
 
     if mode == "cluster":
-        return reconfigure_patroni(vm_ip, pg_config, ram_gb)
+        return reconfigure_patroni(vm_ip, pg_config, ram_gb, jump_host)
     else:
-        return reconfigure_postgres_single(vm_ip, pg_config, ram_gb)
+        return reconfigure_postgres_single(vm_ip, pg_config, ram_gb, jump_host)
 
 
-def reconfigure_postgres_single(vm_ip: str, pg_config: dict, ram_gb: int) -> bool:
+def reconfigure_postgres_single(
+    vm_ip: str, pg_config: dict, ram_gb: int, jump_host: str | None = None
+) -> bool:
     """Reconfigure single Postgres node via conf.d."""
     config_content = generate_postgresql_conf(pg_config, ram_gb)
 
     # Upload config (PostgreSQL 18)
     upload_cmd = f"cat > /etc/postgresql/18/main/conf.d/tuning.conf << 'EOF'\n{config_content}\nEOF"
-    code, output = run_ssh_command(vm_ip, upload_cmd, timeout=30)
+    code, output = run_ssh_command(vm_ip, upload_cmd, timeout=30, jump_host=jump_host)
     if code != 0:
         print(f"  Failed to upload config: {output}")
         return False
 
     # Restart Postgres
     restart_cmd = "systemctl restart postgresql && sleep 3 && pg_isready"
-    code, output = run_ssh_command(vm_ip, restart_cmd, timeout=60)
+    code, output = run_ssh_command(vm_ip, restart_cmd, timeout=60, jump_host=jump_host)
     if code != 0:
         print(f"  Failed to restart Postgres: {output}")
         return False
@@ -197,7 +211,9 @@ def reconfigure_postgres_single(vm_ip: str, pg_config: dict, ram_gb: int) -> boo
     return True
 
 
-def reconfigure_patroni(vm_ip: str, pg_config: dict, ram_gb: int) -> bool:
+def reconfigure_patroni(
+    vm_ip: str, pg_config: dict, ram_gb: int, jump_host: str | None = None
+) -> bool:
     """Reconfigure Patroni cluster via patronictl."""
     # Generate config values
     shared_buffers = int(ram_gb * 1024 * pg_config["shared_buffers_pct"] / 100)
@@ -205,36 +221,34 @@ def reconfigure_patroni(vm_ip: str, pg_config: dict, ram_gb: int) -> bool:
         ram_gb * 1024 * pg_config["effective_cache_size_pct"] / 100
     )
 
-    # Build patronictl edit-config command (applies to all nodes via DCS)
-    patch_json = json.dumps(
-        {
-            "postgresql": {
-                "parameters": {
-                    "shared_buffers": f"{shared_buffers}MB",
-                    "effective_cache_size": f"{effective_cache_size}MB",
-                    "work_mem": f"{pg_config['work_mem_mb']}MB",
-                    "maintenance_work_mem": f"{pg_config['maintenance_work_mem_mb']}MB",
-                    "max_connections": pg_config["max_connections"],
-                    "random_page_cost": pg_config["random_page_cost"],
-                    "effective_io_concurrency": pg_config["effective_io_concurrency"],
-                    "wal_buffers": f"{pg_config['wal_buffers_mb']}MB",
-                    "max_wal_size": f"{pg_config['max_wal_size_gb']}GB",
-                    "checkpoint_completion_target": pg_config[
-                        "checkpoint_completion_target"
-                    ],
-                    "max_worker_processes": pg_config["max_worker_processes"],
-                    "max_parallel_workers_per_gather": pg_config[
-                        "max_parallel_workers_per_gather"
-                    ],
-                    "max_parallel_workers": pg_config["max_worker_processes"],
-                }
-            }
-        }
-    )
+    # Build YAML patch for patronictl
+    patch_yaml = f"""postgresql:
+  parameters:
+    shared_buffers: "{shared_buffers}MB"
+    effective_cache_size: "{effective_cache_size}MB"
+    work_mem: "{pg_config['work_mem_mb']}MB"
+    maintenance_work_mem: "{pg_config['maintenance_work_mem_mb']}MB"
+    max_connections: {pg_config["max_connections"]}
+    random_page_cost: {pg_config["random_page_cost"]}
+    effective_io_concurrency: {pg_config["effective_io_concurrency"]}
+    wal_buffers: "{pg_config['wal_buffers_mb']}MB"
+    max_wal_size: "{pg_config['max_wal_size_gb']}GB"
+    checkpoint_completion_target: {pg_config["checkpoint_completion_target"]}
+    max_worker_processes: {pg_config["max_worker_processes"]}
+    max_parallel_workers_per_gather: {pg_config["max_parallel_workers_per_gather"]}
+    max_parallel_workers: {pg_config["max_worker_processes"]}
+"""
+
+    # Write config to temp file and apply via patronictl
+    write_cmd = f"cat > /tmp/pg_config.yaml << 'EOFCONFIG'\n{patch_yaml}EOFCONFIG"
+    code, output = run_ssh_command(vm_ip, write_cmd, timeout=30, jump_host=jump_host)
+    if code != 0:
+        print(f"  Failed to write config file: {output}")
+        return False
 
     # Apply config change via patronictl
-    edit_cmd = f"patronictl -c /etc/patroni/patroni.yml edit-config --apply '{patch_json}' --force"
-    code, output = run_ssh_command(vm_ip, edit_cmd, timeout=60)
+    edit_cmd = "patronictl -c /etc/patroni/patroni.yml edit-config --apply /tmp/pg_config.yaml --force"
+    code, output = run_ssh_command(vm_ip, edit_cmd, timeout=60, jump_host=jump_host)
     if code != 0:
         print(f"  Failed to update Patroni config: {output}")
         return False
@@ -243,14 +257,14 @@ def reconfigure_patroni(vm_ip: str, pg_config: dict, ram_gb: int) -> bool:
     restart_cmd = (
         "patronictl -c /etc/patroni/patroni.yml restart postgres-cluster --force"
     )
-    code, output = run_ssh_command(vm_ip, restart_cmd, timeout=120)
+    code, output = run_ssh_command(vm_ip, restart_cmd, timeout=120, jump_host=jump_host)
     if code != 0:
         print(f"  Warning: Patroni restart returned non-zero: {output}")
 
     # Wait for cluster to be healthy
     time.sleep(10)
     check_cmd = "patronictl -c /etc/patroni/patroni.yml list"
-    code, output = run_ssh_command(vm_ip, check_cmd, timeout=30)
+    code, output = run_ssh_command(vm_ip, check_cmd, timeout=30, jump_host=jump_host)
     if "Leader" in output:
         print("  Patroni cluster reconfigured successfully")
         return True
@@ -275,7 +289,10 @@ def ensure_infra(
         print(f"  Found Postgres VM: {postgres_ip}")
         print(f"  Found Benchmark VM: {benchmark_ip}")
         try:
-            code, _ = run_ssh_command(postgres_ip, "pg_isready", timeout=10)
+            # Use benchmark VM as jump host to reach internal postgres IP
+            code, _ = run_ssh_command(
+                postgres_ip, "pg_isready", timeout=10, jump_host=benchmark_ip
+            )
             if code == 0:
                 return benchmark_ip, postgres_ip
         except Exception:
@@ -315,19 +332,23 @@ def ensure_infra(
     print(f"  Postgres VM: {postgres_ip}")
     print(f"  Benchmark VM: {benchmark_ip}")
 
-    wait_for_vm_ready(postgres_ip)
+    # Wait for benchmark VM first (it has public IP)
     wait_for_vm_ready(benchmark_ip)
+    # Wait for postgres VM via jump host (internal IP only)
+    wait_for_vm_ready(postgres_ip, jump_host=benchmark_ip)
 
     # Wait for Postgres to be ready
     if mode == "cluster":
-        wait_for_patroni_ready(postgres_ip)
+        wait_for_patroni_ready(postgres_ip, jump_host=benchmark_ip)
     else:
-        wait_for_postgres_ready(postgres_ip)
+        wait_for_postgres_ready(postgres_ip, jump_host=benchmark_ip)
 
     return benchmark_ip, postgres_ip
 
 
-def wait_for_patroni_ready(vm_ip: str, timeout: int = 300) -> bool:
+def wait_for_patroni_ready(
+    vm_ip: str, timeout: int = 300, jump_host: str | None = None
+) -> bool:
     """Wait for Patroni cluster to be ready with a primary."""
     print("  Waiting for Patroni cluster to elect a primary...")
 
@@ -339,12 +360,15 @@ def wait_for_patroni_ready(vm_ip: str, timeout: int = 300) -> bool:
                 vm_ip,
                 "curl -s http://localhost:8008/leader 2>/dev/null || curl -s http://localhost:8008/ 2>/dev/null",
                 timeout=10,
+                jump_host=jump_host,
             )
             if code == 0 and (
                 "running" in output.lower() or "leader" in output.lower()
             ):
                 # Also verify pg_isready
-                code2, _ = run_ssh_command(vm_ip, "pg_isready -h 127.0.0.1", timeout=10)
+                code2, _ = run_ssh_command(
+                    vm_ip, "pg_isready -h 127.0.0.1", timeout=10, jump_host=jump_host
+                )
                 if code2 == 0:
                     print(f"  Patroni cluster ready! ({time.time() - start:.0f}s)")
                     return True
@@ -356,14 +380,18 @@ def wait_for_patroni_ready(vm_ip: str, timeout: int = 300) -> bool:
     return False
 
 
-def wait_for_postgres_ready(vm_ip: str, timeout: int = 180) -> bool:
+def wait_for_postgres_ready(
+    vm_ip: str, timeout: int = 180, jump_host: str | None = None
+) -> bool:
     """Wait for Postgres to be ready."""
     print("  Waiting for Postgres to be ready...")
 
     start = time.time()
     while time.time() - start < timeout:
         try:
-            code, output = run_ssh_command(vm_ip, "pg_isready", timeout=10)
+            code, output = run_ssh_command(
+                vm_ip, "pg_isready", timeout=10, jump_host=jump_host
+            )
             if code == 0:
                 print(f"  Postgres is ready! ({time.time() - start:.0f}s)")
                 return True
@@ -375,12 +403,14 @@ def wait_for_postgres_ready(vm_ip: str, timeout: int = 180) -> bool:
     return False
 
 
-def initialize_pgbench(postgres_ip: str, scale: int = 100) -> bool:
+def initialize_pgbench(
+    postgres_ip: str, scale: int = 100, jump_host: str | None = None
+) -> bool:
     """Initialize pgbench database on Postgres VM."""
     print(f"  Initializing pgbench (scale={scale}) on Postgres VM...")
 
     init_cmd = f"sudo -u postgres pgbench -i -s {scale} postgres"
-    code, output = run_ssh_command(postgres_ip, init_cmd, timeout=300)
+    code, output = run_ssh_command(postgres_ip, init_cmd, timeout=300, jump_host=jump_host)
     if code != 0:
         print(f"  Warning: pgbench init may have failed: {output[:500]}")
         return False
@@ -724,12 +754,14 @@ def objective_infra(
 
     # Configure Postgres
     mode = infra_config.get("mode", "single")
-    if not reconfigure_postgres(postgres_ip, pg_config, ram_gb, mode):
+    if not reconfigure_postgres(
+        postgres_ip, pg_config, ram_gb, mode, jump_host=benchmark_ip
+    ):
         raise optuna.TrialPruned("Postgres config failed")
 
     # Initialize pgbench (scale based on RAM)
     scale = max(50, ram_gb * 10)
-    if not initialize_pgbench(postgres_ip, scale=scale):
+    if not initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip):
         raise optuna.TrialPruned("pgbench init failed")
 
     # Run benchmark
@@ -821,7 +853,9 @@ def objective_config(
 
     # Reconfigure Postgres (no VM recreation)
     mode = infra_config.get("mode", "single")
-    if not reconfigure_postgres(postgres_ip, pg_config, ram_gb, mode):
+    if not reconfigure_postgres(
+        postgres_ip, pg_config, ram_gb, mode, jump_host=benchmark_ip
+    ):
         raise optuna.TrialPruned("Postgres config failed")
 
     # Run benchmark
@@ -943,7 +977,7 @@ Examples:
 
             # Initialize pgbench once
             scale = max(50, args.ram * 10)
-            initialize_pgbench(postgres_ip, scale=scale)
+            initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip)
 
             study = optuna.create_study(
                 study_name=f"postgres-{args.cloud}-config",
@@ -1005,7 +1039,7 @@ Examples:
             benchmark_ip, postgres_ip = ensure_infra(cloud_config, infra_config)
 
             scale = max(50, infra_config["ram_gb"] * 10)
-            initialize_pgbench(postgres_ip, scale=scale)
+            initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip)
 
             study_config = optuna.create_study(
                 study_name=f"postgres-{args.cloud}-full-config",
