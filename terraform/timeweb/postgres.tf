@@ -78,7 +78,7 @@ locals {
     templatefile("${path.module}/../cloud-init/timeweb/postgres-single.yaml.tftpl", {
       ssh_public_key = file(var.ssh_public_key_path)
     })
-  ] : [
+    ] : [
     for i in range(3) : templatefile("${path.module}/../cloud-init/timeweb/postgres-cluster.yaml.tftpl", {
       ssh_public_key = file(var.ssh_public_key_path)
       node_index     = i

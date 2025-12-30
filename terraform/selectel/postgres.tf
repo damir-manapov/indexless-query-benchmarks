@@ -154,7 +154,7 @@ resource "openstack_networking_port_v2" "postgres" {
 locals {
   postgres_cloud_init = var.postgres_mode == "single" ? [
     templatefile("${path.module}/../cloud-init/selectel/postgres-single.yaml.tftpl", {})
-  ] : [
+    ] : [
     for i in range(3) : templatefile("${path.module}/../cloud-init/selectel/postgres-cluster.yaml.tftpl", {
       node_index = i
       node_count = 3
