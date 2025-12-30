@@ -86,7 +86,7 @@ The benchmark uses a realistic mix of search queries:
 
 ## Dataset
 
-Synthetic e-commerce products (500K documents):
+Synthetic e-commerce products (500K documents), generated using Node.js:
 
 ```json
 {
@@ -104,6 +104,16 @@ Synthetic e-commerce products (500K documents):
 - **Searchable**: title, description, brand
 - **Filterable**: category, brand, price, rating, in_stock
 - **Sortable**: price, rating
+
+### Local Dataset Generation (TypeScript)
+
+```bash
+# Generate 500K products
+npx tsx dataset.ts --count 500000 --output products.ndjson
+
+# Generate smaller test set
+npx tsx dataset.ts --count 1000 --output test.ndjson
+```
 
 ## Infrastructure
 

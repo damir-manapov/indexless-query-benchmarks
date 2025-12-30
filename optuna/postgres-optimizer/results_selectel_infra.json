@@ -68,5 +68,40 @@
     "transactions": 119219,
     "duration_s": 61.671369552612305,
     "error": null
+  },
+  {
+    "trial": 26,
+    "timestamp": "2025-12-30T10:57:54.528174",
+    "cloud": "selectel",
+    "mode": "infra",
+    "infra_config": {
+      "mode": "single",
+      "cpu": 2,
+      "ram_gb": 16,
+      "disk_type": "fast",
+      "disk_size_gb": 50
+    },
+    "pg_config": {
+      "shared_buffers_pct": 25,
+      "effective_cache_size_pct": 75,
+      "work_mem_mb": 64,
+      "maintenance_work_mem_mb": 256,
+      "max_connections": 100,
+      "random_page_cost": 1.1,
+      "effective_io_concurrency": 200,
+      "wal_buffers_mb": 64,
+      "max_wal_size_gb": 2,
+      "checkpoint_completion_target": 0.9,
+      "max_worker_processes": 2,
+      "max_parallel_workers_per_gather": 1
+    },
+    "cost_per_hour": 4.95,
+    "cost_efficiency": 351.84095838383837,
+    "tps": 1741.612744,
+    "latency_avg_ms": 4.59,
+    "latency_stddev_ms": 2.211,
+    "transactions": 104474,
+    "duration_s": 61.786513805389404,
+    "error": null
   }
 ]

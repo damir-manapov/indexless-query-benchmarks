@@ -128,42 +128,53 @@ def upload_and_index_dataset(
     """Generate, upload and index the dataset. Returns indexing time in seconds."""
     print(f"  Generating and indexing {DATASET_SIZE:,} products...")
     
-    # Generate dataset on benchmark VM
+    # Generate dataset on benchmark VM using Node.js
     gen_cmd = f"""
-cd /tmp && python3 << 'PYEOF'
-import json
-import random
+cd /tmp && node << 'JSEOF'
+const fs = require('fs');
 
-random.seed(42)
+// Seeded RNG (Mulberry32)
+let seed = 42;
+function rng() {{
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = seed;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}}
 
-CATEGORIES = ["Laptops", "Smartphones", "Tablets", "Headphones", "Cameras", "TVs", "Gaming", "Wearables", "Audio", "Accessories"]
-BRANDS = ["Apple", "Samsung", "Sony", "LG", "Dell", "HP", "Lenovo", "Asus", "Acer", "Microsoft", "Google", "Bose", "JBL", "Canon", "Nikon"]
-ADJECTIVES = ["Pro", "Ultra", "Max", "Plus", "Lite", "Mini", "Elite", "Premium", "Advanced", "Essential"]
+const pick = arr => arr[Math.floor(rng() * arr.length)];
 
-def gen_product(i):
-    cat = random.choice(CATEGORIES)
-    brand = random.choice(BRANDS)
-    adj = random.choice(ADJECTIVES)
-    price_base = {{"Laptops": 1000, "Smartphones": 500, "Tablets": 400, "Headphones": 100, "Cameras": 800, "TVs": 600, "Gaming": 200, "Wearables": 200, "Audio": 150, "Accessories": 30}}
-    return {{
-        "id": i,
-        "title": f"{{brand}} {{adj}} {{cat[:-1] if cat.endswith('s') else cat}} {{i % 20}}",
-        "description": f"High-quality {{cat.lower()}} from {{brand}} with {{adj.lower()}} features",
-        "brand": brand,
-        "category": cat,
-        "price": round(price_base[cat] * random.uniform(0.5, 2.5), 2),
-        "rating": round(random.uniform(3.0, 5.0), 1),
-        "in_stock": random.random() > 0.1
-    }}
+const CATEGORIES = ["Laptops", "Smartphones", "Tablets", "Headphones", "Cameras", "TVs", "Gaming", "Wearables", "Audio", "Accessories"];
+const BRANDS = ["Apple", "Samsung", "Sony", "LG", "Dell", "HP", "Lenovo", "Asus", "Acer", "Microsoft", "Google", "Bose", "JBL", "Canon", "Nikon"];
+const ADJECTIVES = ["Pro", "Ultra", "Max", "Plus", "Lite", "Mini", "Elite", "Premium", "Advanced", "Essential"];
+const PRICE_BASE = {{Laptops: 1000, Smartphones: 500, Tablets: 400, Headphones: 100, Cameras: 800, TVs: 600, Gaming: 200, Wearables: 200, Audio: 150, Accessories: 30}};
 
-with open("/tmp/products.ndjson", "w") as f:
-    for i in range(1, {DATASET_SIZE} + 1):
-        f.write(json.dumps(gen_product(i)) + "\\n")
-        if i % 100000 == 0:
-            print(f"Generated {{i}} products", flush=True)
+function genProduct(i) {{
+  const cat = pick(CATEGORIES);
+  const brand = pick(BRANDS);
+  const adj = pick(ADJECTIVES);
+  const singular = cat.endsWith('s') ? cat.slice(0, -1) : cat;
+  return {{
+    id: i,
+    title: `${{brand}} ${{adj}} ${{singular}} ${{i % 20}}`,
+    description: `High-quality ${{cat.toLowerCase()}} from ${{brand}} with ${{adj.toLowerCase()}} features`,
+    brand,
+    category: cat,
+    price: Math.round(PRICE_BASE[cat] * (0.5 + rng() * 2) * 100) / 100,
+    rating: Math.round((3 + rng() * 2) * 10) / 10,
+    in_stock: rng() > 0.1
+  }};
+}}
 
-print(f"Done generating {DATASET_SIZE} products")
-PYEOF
+const stream = fs.createWriteStream('/tmp/products.ndjson');
+const total = {DATASET_SIZE};
+for (let i = 1; i <= total; i++) {{
+  stream.write(JSON.stringify(genProduct(i)) + '\\n');
+  if (i % 100000 === 0) console.log(`Generated ${{i}} products`);
+}}
+stream.end(() => console.log(`Done generating ${{total}} products`));
+JSEOF
 """
     code, output = run_ssh_command(benchmark_ip, gen_cmd, timeout=300)
     if code != 0:
