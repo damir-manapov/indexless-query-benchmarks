@@ -118,5 +118,23 @@
     "error_rate": 0.0,
     "indexing_time_s": 16.07616114616394,
     "error": null
+  },
+  {
+    "trial": 8,
+    "timestamp": "2026-01-03T01:06:52.644796",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 32,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "qps": 658.709809463119,
+    "p50_ms": 1,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 14.434776544570923,
+    "error": null
   }
 ]
