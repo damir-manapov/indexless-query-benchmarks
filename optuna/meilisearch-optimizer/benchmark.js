@@ -88,8 +88,8 @@ export const options = {
   vus: parseInt(__ENV.VUS) || 10,
   duration: __ENV.DURATION || "60s",
   thresholds: {
-    http_req_duration: ["p(95)<500"],
-    search_latency_ms: ["p(95)<100"],
+    http_req_duration: ["p(95)<500", "p(99)<1000"],
+    search_latency_ms: ["p(95)<100", "p(99)<200"],
     search_errors: ["count<100"],
   },
 };
