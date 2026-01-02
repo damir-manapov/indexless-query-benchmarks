@@ -946,7 +946,7 @@ Examples:
         if mode == Mode.INFRA:
             # Infrastructure optimization
             study = optuna.create_study(
-                study_name=f"postgres-{args.cloud}-infra",
+                study_name=f"postgres-{args.cloud}-infra-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction="maximize" if args.metric != "latency_avg_ms" else "minimize",
@@ -982,7 +982,7 @@ Examples:
             initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip)
 
             study = optuna.create_study(
-                study_name=f"postgres-{args.cloud}-config",
+                study_name=f"postgres-{args.cloud}-config-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction="maximize" if args.metric != "latency_avg_ms" else "minimize",
@@ -1008,7 +1008,7 @@ Examples:
             print("\n=== Phase 1: Infrastructure optimization ===")
 
             study_infra = optuna.create_study(
-                study_name=f"postgres-{args.cloud}-full-infra",
+                study_name=f"postgres-{args.cloud}-full-infra-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction="maximize",
@@ -1044,7 +1044,7 @@ Examples:
             initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip)
 
             study_config = optuna.create_study(
-                study_name=f"postgres-{args.cloud}-full-config",
+                study_name=f"postgres-{args.cloud}-full-config-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction="maximize" if args.metric != "latency_avg_ms" else "minimize",
