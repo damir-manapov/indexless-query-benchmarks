@@ -89,12 +89,15 @@ def results_file(cloud: str) -> Path:
 ```
 
 Current implementations:
-| Optimizer | Has Modes | Cache Pattern |
-|-----------|-----------|---------------|
-| meilisearch | ✅ infra/config/full | `results_{cloud}_{mode}.json` |
-| postgres | ✅ infra/config/full | `results_{cloud}_{mode}.json` |
-| minio | ❌ single | `results_{cloud}.json` |
-| redis | ❌ single | `results_{cloud}.json` |
+| Optimizer | Modes | Cache Pattern |
+|-----------|-------|---------------|
+| meilisearch | infra/config/full | `results_{cloud}_{mode}.json` |
+| postgres | infra/config/full | `results_{cloud}_{mode}.json` |
+| minio | infra (default) | `results_{cloud}_{mode}.json` |
+| redis | infra (default) | `results_{cloud}_{mode}.json` |
+
+All optimizers now use consistent `results_{cloud}_{mode}.json` naming.
+MinIO and Redis currently only implement infra mode (all parameters require VM changes).
 
 ```python
 def config_to_key(infra: dict, config: dict) -> str:
@@ -148,14 +151,14 @@ def ensure_infra(cloud_config: CloudConfig, infra_config: dict) -> tuple[str, st
         current_specs = get_tf_output(tf, "vm_specs")
         if specs_match(current_specs, infra_config):
             return current_ip, get_tf_output(tf, "service_ip")
-    
+
     # Apply new infrastructure
     tf_vars = build_tf_vars(infra_config)
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
-    
+
     if ret_code != 0:
         raise RuntimeError(f"Failed to create infrastructure: {stderr}")
-    
+
     return get_tf_output(tf, "benchmark_vm_ip"), get_tf_output(tf, "service_ip")
 ```
 
@@ -165,18 +168,18 @@ def ensure_infra(cloud_config: CloudConfig, infra_config: dict) -> tuple[str, st
 def run_benchmark(benchmark_ip: str, service_ip: str, 
                   config: dict) -> BenchmarkResult:
     """Execute benchmark and return metrics."""
-    
+
     # 1. Configure service with new settings
     if not apply_config(benchmark_ip, service_ip, config):
         return BenchmarkResult(error="Failed to apply config")
-    
+
     # 2. Wait for service ready
     if not wait_for_service_ready(service_ip):
         return BenchmarkResult(error="Service not ready")
-    
+
     # 3. Run benchmark tool (k6, pgbench, memtier, warp, etc.)
     code, output = run_ssh_command(benchmark_ip, benchmark_cmd, timeout=300)
-    
+
     # 4. Parse results
     return parse_benchmark_output(output)
 ```
@@ -213,7 +216,7 @@ def parse_k6_results(results_json: str) -> BenchmarkResult:
 def objective(trial: optuna.Trial, cloud_config: CloudConfig, 
               metric: str, fixed_infra: dict | None = None) -> float:
     """Optuna objective function."""
-    
+
     # 1. Sample parameters
     if fixed_infra:
         infra = fixed_infra
@@ -222,32 +225,32 @@ def objective(trial: optuna.Trial, cloud_config: CloudConfig,
             "cpu": trial.suggest_categorical("cpu", [2, 4, 8, 16]),
             "ram_gb": trial.suggest_categorical("ram_gb", [4, 8, 16, 32]),
         }
-    
+
     config = {
         "max_connections": trial.suggest_int("max_connections", 50, 500),
         "cache_mb": trial.suggest_int("cache_mb", 64, 4096, log=True),
     }
-    
+
     # 2. Check cache first
     cached = find_cached_result(infra, config, cloud_config.name, mode)
     if cached:
         print(f"  Using cached result")
         return get_metric_value(cached, metric)
-    
+
     # 3. Create/update infrastructure
     try:
         benchmark_ip, service_ip = ensure_infra(cloud_config, infra)
     except RuntimeError as e:
         print(f"  Infrastructure failed: {e}")
         raise optuna.TrialPruned()
-    
+
     # 4. Run benchmark
     result = run_benchmark(benchmark_ip, service_ip, config)
-    
+
     if not result.is_valid():
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned()
-    
+
     # 5. Save and return
     save_result(cloud_config.name, mode, infra, config, result, trial.number)
     return get_metric_value(result, metric)
@@ -268,21 +271,21 @@ def main():
     parser.add_argument("--show-results", action="store_true")
     parser.add_argument("--destroy", action="store_true")
     args = parser.parse_args()
-    
+
     cloud_config = get_cloud_config(args.cloud)
-    
+
     if args.show_results:
         show_results(args.cloud, args.mode)
         return
-    
+
     if args.destroy:
         destroy_all(cloud_config.terraform_dir, cloud_config.name)
         return
-    
+
     # Create/load Optuna study
     storage = f"sqlite:///{Path(__file__).parent}/study.db"
     study_name = f"{SERVICE_NAME}-{args.cloud}-{args.mode}"
-    
+
     direction = "maximize" if args.metric == "throughput" else "minimize"
     study = optuna.create_study(
         study_name=study_name,
@@ -290,12 +293,12 @@ def main():
         direction=direction,
         load_if_exists=True,
     )
-    
+
     # Build objective with fixed params
     fixed_infra = None
     if args.mode == "config":
         fixed_infra = {"cpu": args.cpu, "ram_gb": args.ram, "disk_type": "fast"}
-    
+
     try:
         study.optimize(
             lambda t: objective(t, cloud_config, args.metric, fixed_infra),

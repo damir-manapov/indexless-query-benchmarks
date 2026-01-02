@@ -216,9 +216,9 @@ def get_metric_value(result: dict, metric: str) -> float:
     return result.get(metric, 0)
 
 
-def results_file(cloud: str) -> Path:
-    """Get results file path for a cloud."""
-    return RESULTS_DIR / f"results_{cloud}.json"
+def results_file(cloud: str, mode: str = "infra") -> Path:
+    """Get results file path for a cloud and mode."""
+    return RESULTS_DIR / f"results_{cloud}_{mode}.json"
 
 
 @dataclass

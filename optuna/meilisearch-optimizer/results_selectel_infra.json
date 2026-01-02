@@ -1,0 +1,19 @@
+[
+  {
+    "trial": 9,
+    "timestamp": "2026-01-02T20:02:48.386993",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 32,
+      "disk_type": "universal"
+    },
+    "config": {},
+    "qps": 638.7394295120569,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 18.337809324264526,
+    "error": null
+  }
+]
