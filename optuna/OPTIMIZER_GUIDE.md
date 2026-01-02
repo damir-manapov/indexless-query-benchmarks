@@ -121,6 +121,9 @@ def save_result(cloud: str, infra: dict, config: dict,
         },
     })
     save_results(results, path)
+
+    # Auto-export markdown after each trial for live updates
+    export_results_md(cloud)
 ```
 
 ### 5. Infrastructure Management

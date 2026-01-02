@@ -539,6 +539,9 @@ def save_result(
 
     save_results(results, results_file())
 
+    # Auto-export markdown after each trial
+    export_results_md(cloud)
+
 
 def get_metric_value(result: dict, metric: str) -> float:
     """Extract the optimization metric value from a result."""
@@ -558,9 +561,14 @@ def pg_summary(c: dict) -> str:
     return f"sb={c.get('shared_buffers_pct', 0)}% wm={c.get('work_mem_mb', 0)}mb mc={c.get('max_connections', 0)}"
 
 
-def format_results(cloud: str, mode: str) -> dict | None:
+def format_results(cloud: str) -> dict | None:
     """Format benchmark results for display."""
     results = load_results(results_file())
+    if not results:
+        return None
+
+    # Filter by cloud
+    results = [r for r in results if r.get("cloud", "") == cloud]
     if not results:
         return None
 
@@ -572,6 +580,7 @@ def format_results(cloud: str, mode: str) -> dict | None:
         pg = r.get("pg_config", {})
         rows.append(
             {
+                "mode": r.get("mode", "?"),
                 "cpu": infra.get("cpu", 0),
                 "ram": infra.get("ram_gb", 0),
                 "disk": infra.get("disk_type", "?"),
@@ -591,7 +600,6 @@ def format_results(cloud: str, mode: str) -> dict | None:
 
     return {
         "cloud": cloud,
-        "mode": mode,
         "rows": rows,
         "best": {
             "tps": {
@@ -613,30 +621,30 @@ def format_results(cloud: str, mode: str) -> dict | None:
     }
 
 
-def show_results(cloud: str, mode: str) -> None:
+def show_results(cloud: str) -> None:
     """Display benchmark results."""
-    data = format_results(cloud, mode)
+    data = format_results(cloud)
     if not data:
-        print(f"No results found for {cloud}/{mode}")
+        print(f"No results found for {cloud}")
         return
 
-    print(f"\n{'=' * 100}")
-    print(f"Postgres Benchmark Results - {cloud.upper()} [{mode}]")
-    print(f"{'=' * 100}")
+    print(f"\n{'=' * 110}")
+    print(f"Postgres Benchmark Results - {cloud.upper()}")
+    print(f"{'=' * 110}")
 
     print(
-        f"{'#':>3} {'CPU':>4} {'RAM':>4} {'Disk':<5} {'SB%':>4} {'WM':>5} {'MC':>4} "
+        f"{'#':>3} {'Mode':<6} {'CPU':>4} {'RAM':>4} {'Disk':<5} {'SB%':>4} {'WM':>5} {'MC':>4} "
         f"{'TPS':>10} {'Lat(ms)':>8} {'$/hr':>6} {'Eff':>8}"
     )
-    print("-" * 100)
+    print("-" * 110)
 
     for i, r in enumerate(data["rows"], 1):
         print(
-            f"{i:>3} {r['cpu']:>4} {r['ram']:>4} {r['disk']:<5} {r['sb_pct']:>4} {r['wm_mb']:>5} {r['mc']:>4} "
+            f"{i:>3} {r['mode']:<6} {r['cpu']:>4} {r['ram']:>4} {r['disk']:<5} {r['sb_pct']:>4} {r['wm_mb']:>5} {r['mc']:>4} "
             f"{r['tps']:>10.1f} {r['lat']:>8.2f} {r['cost']:>6.2f} {r['eff']:>8.0f}"
         )
 
-    print("-" * 100)
+    print("-" * 110)
     print(f"Total: {len(data['rows'])} results")
 
     best = data["best"]
@@ -651,30 +659,30 @@ def show_results(cloud: str, mode: str) -> None:
     )
 
 
-def export_results_md(cloud: str, mode: str, output_path: Path | None = None) -> None:
+def export_results_md(cloud: str, output_path: Path | None = None) -> None:
     """Export benchmark results to markdown."""
-    data = format_results(cloud, mode)
+    data = format_results(cloud)
     if not data:
-        print(f"No results found for {cloud}/{mode}")
+        print(f"No results found for {cloud}")
         return
 
     if output_path is None:
-        output_path = RESULTS_DIR / f"RESULTS_{cloud.upper()}_{mode.upper()}.md"
+        output_path = RESULTS_DIR / f"RESULTS_{cloud.upper()}.md"
 
     lines = [
-        f"# Postgres Benchmark Results - {cloud.upper()} [{mode}]",
+        f"# Postgres Benchmark Results - {cloud.upper()}",
         "",
         f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "## Results",
         "",
-        "| # | CPU | RAM | Disk | SB% | WM | MC | TPS | Lat(ms) | $/hr | Efficiency |",
-        "|--:|----:|----:|------|----:|---:|---:|----:|--------:|-----:|-----------:|",
+        "| # | Mode | CPU | RAM | Disk | SB% | WM | MC | TPS | Lat(ms) | $/hr | Efficiency |",
+        "|--:|------|----:|----:|------|----:|---:|---:|----:|--------:|-----:|-----------:|",
     ]
 
     for i, r in enumerate(data["rows"], 1):
         lines.append(
-            f"| {i} | {r['cpu']} | {r['ram']} | {r['disk']} | {r['sb_pct']} | {r['wm_mb']} | {r['mc']} "
+            f"| {i} | {r['mode']} | {r['cpu']} | {r['ram']} | {r['disk']} | {r['sb_pct']} | {r['wm_mb']} | {r['mc']} "
             f"| {r['tps']:.1f} | {r['lat']:.2f} | {r['cost']:.2f} | {r['eff']:.0f} |"
         )
 
@@ -929,11 +937,11 @@ Examples:
 
     # Handle display modes
     if args.show_results:
-        show_results(args.cloud, args.mode)
+        show_results(args.cloud)
         return
 
     if args.export_md:
-        export_results_md(args.cloud, args.mode)
+        export_results_md(args.cloud)
         return
 
     print(f"\nPostgres Optimizer - {args.cloud.upper()} [{mode.value}]")
@@ -1085,10 +1093,8 @@ Examples:
             print("No study was created")
 
         # Auto-export results
-        export_results_md(args.cloud, args.mode)
-        print(
-            f"\nResults exported to RESULTS_{args.cloud.upper()}_{args.mode.upper()}.md"
-        )
+        export_results_md(args.cloud)
+        print(f"\nResults exported to RESULTS_{args.cloud.upper()}.md")
 
     finally:
         if not args.no_destroy:

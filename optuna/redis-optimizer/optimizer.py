@@ -507,6 +507,9 @@ def save_result(
 
     save_results(results, results_file())
 
+    # Auto-export markdown after each trial
+    export_results_md(cloud)
+
 
 def get_metric_value(result: dict, metric: str) -> float:
     """Extract the optimization metric value from a result."""

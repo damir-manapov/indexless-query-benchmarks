@@ -510,6 +510,9 @@ def save_result(
 
     save_results(results, rf)
 
+    # Auto-export markdown after each trial
+    export_results_md(cloud)
+
 
 def config_summary(r: dict) -> str:
     """Format config as a compact string."""
@@ -993,6 +996,10 @@ def main():
             print(f"Infra: {infra_config}")
             print(f"Config: {study_config.best_params}")
             print(f"Best {args.metric}: {study_config.best_value}")
+
+        # Auto-export results to markdown
+        export_results_md(args.cloud)
+        print(f"\nResults exported to RESULTS_{args.cloud.upper()}.md")
 
     finally:
         if not args.no_destroy:

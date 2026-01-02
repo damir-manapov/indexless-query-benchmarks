@@ -887,6 +887,9 @@ def save_result(
 
     save_results(results, results_file())
 
+    # Auto-export markdown after each trial
+    export_results_md(cloud)
+
 
 def objective(
     trial: optuna.Trial,

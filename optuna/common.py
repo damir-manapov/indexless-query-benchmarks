@@ -66,6 +66,9 @@ def wait_for_vm_ready(
             if code == 0:
                 print("  VM is ready!")
                 return True
+            else:
+                elapsed = int(time.time() - start)
+                print(f"  Marker file not ready yet ({elapsed}s elapsed)")
         except Exception as e:
             print(f"  SSH not ready yet: {e}")
         time.sleep(10)
