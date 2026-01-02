@@ -15,7 +15,9 @@ write_files:
       MEILI_NO_ANALYTICS=true
       MEILI_LOG_LEVEL=INFO
       MEILI_MAX_INDEXING_MEMORY=${max_indexing_memory}
+%{ if max_indexing_threads != "auto" ~}
       MEILI_MAX_INDEXING_THREADS=${max_indexing_threads}
+%{ endif ~}
     permissions: '0600'
 
   - path: /etc/systemd/system/meilisearch.service
