@@ -39,13 +39,13 @@ class BenchmarkResult:
     latency_p50_ms: float = 0
     latency_p95_ms: float = 0
     latency_p99_ms: float = 0
-    
+
     # Optional metrics
     error_rate: float = 0
-    
+
     # Error handling
     error: str | None = None
-    
+
     def is_valid(self) -> bool:
         return self.error is None and self.throughput > 0
 ```
@@ -77,10 +77,26 @@ def get_config_search_space() -> dict:
 **Required for all optimizers** to avoid re-running expensive benchmarks:
 
 ```python
+# For optimizers WITH modes (infra/config/full):
 def results_file(cloud: str, mode: str) -> Path:
     """Return path to JSON results cache."""
     return Path(__file__).parent / f"results_{cloud.lower()}_{mode}.json"
 
+# For optimizers WITHOUT modes (single objective):
+def results_file(cloud: str) -> Path:
+    """Return path to JSON results cache."""
+    return Path(__file__).parent / f"results_{cloud.lower()}.json"
+```
+
+Current implementations:
+| Optimizer | Has Modes | Cache Pattern |
+|-----------|-----------|---------------|
+| meilisearch | ✅ infra/config/full | `results_{cloud}_{mode}.json` |
+| postgres | ✅ infra/config/full | `results_{cloud}_{mode}.json` |
+| minio | ❌ single | `results_{cloud}.json` |
+| redis | ❌ single | `results_{cloud}.json` |
+
+```python
 def config_to_key(infra: dict, config: dict) -> str:
     """Create unique key from config for deduplication."""
     combined = {**infra, **config}
@@ -91,7 +107,7 @@ def find_cached_result(
 ) -> dict | None:
     """Search cache for existing result. Check ALL modes for cross-mode hits."""
     key = config_to_key(infra, config)
-    
+
     # Search across all modes (results from infra mode can be used in config mode)
     for search_mode in ["infra", "config", "full"]:
         results = load_results(results_file(cloud, search_mode))
@@ -125,7 +141,7 @@ def save_result(cloud: str, mode: str, infra: dict, config: dict,
 def ensure_infra(cloud_config: CloudConfig, infra_config: dict) -> tuple[str, str]:
     """Create or update infrastructure. Returns (benchmark_ip, service_ip)."""
     tf = get_terraform(cloud_config.terraform_dir)
-    
+
     # Check if VM exists with matching specs
     current_ip = get_tf_output(tf, "benchmark_vm_ip")
     if current_ip and validate_vm_exists(current_ip):
