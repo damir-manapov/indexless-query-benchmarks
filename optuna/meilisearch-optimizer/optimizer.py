@@ -293,17 +293,26 @@ k6 run /tmp/benchmark.js \\
         return BenchmarkResult(error="Failed to get k6 results")
 
     try:
-        # Find the JSON in output
+        # Debug: print first 200 chars of output
+        print(f"  k6 results (first 200 chars): {results_json[:200]!r}")
+
+        # Find valid JSON in output - might have warnings/logs mixed in
+        json_content = None
         for line in results_json.strip().split("\n"):
-            if line.startswith("{"):
-                results = json.loads(line)
-                break
-        else:
-            results = json.loads(results_json.strip())
+            line = line.strip()
+            if line.startswith("{") and line.endswith("}"):
+                try:
+                    json_content = json.loads(line)
+                    break
+                except json.JSONDecodeError:
+                    continue
 
-        metrics = results.get("metrics", {})
+        if json_content is None:
+            # Try parsing entire content
+            json_content = json.loads(results_json.strip())
 
-        # Extract metrics
+        # Extract metrics from parsed JSON
+        metrics = json_content.get("metrics", {})
         http_reqs = metrics.get("http_reqs", {})
         search_latency = metrics.get("search_latency_ms", {})
         search_errors = metrics.get("search_errors", {})
