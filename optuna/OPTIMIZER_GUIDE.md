@@ -77,26 +77,20 @@ def get_config_search_space() -> dict:
 **Required for all optimizers** to avoid re-running expensive benchmarks:
 
 ```python
-# For optimizers WITH modes (infra/config/full):
-def results_file(cloud: str, mode: str) -> Path:
+def results_file(cloud: str, mode: str = "infra") -> Path:
     """Return path to JSON results cache."""
     return Path(__file__).parent / f"results_{cloud.lower()}_{mode}.json"
-
-# For optimizers WITHOUT modes (single objective):
-def results_file(cloud: str) -> Path:
-    """Return path to JSON results cache."""
-    return Path(__file__).parent / f"results_{cloud.lower()}.json"
 ```
 
-Current implementations:
-| Optimizer | Modes | Cache Pattern |
-|-----------|-------|---------------|
-| meilisearch | infra/config/full | `results_{cloud}_{mode}.json` |
-| postgres | infra/config/full | `results_{cloud}_{mode}.json` |
-| minio | infra (default) | `results_{cloud}_{mode}.json` |
-| redis | infra (default) | `results_{cloud}_{mode}.json` |
+All optimizers use consistent `results_{cloud}_{mode}.json` naming:
 
-All optimizers now use consistent `results_{cloud}_{mode}.json` naming.
+| Optimizer | Available Modes | Default Mode |
+|-----------|-----------------|--------------|
+| meilisearch | infra/config/full | infra |
+| postgres | infra/config/full | infra |
+| minio | infra | infra |
+| redis | infra | infra |
+
 MinIO and Redis currently only implement infra mode (all parameters require VM changes).
 
 ```python
