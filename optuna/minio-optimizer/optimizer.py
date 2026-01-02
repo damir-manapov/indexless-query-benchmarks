@@ -64,7 +64,7 @@ def config_summary(r: dict) -> str:
 
 def format_results(cloud: str) -> dict | None:
     """Format benchmark results for display/export. Returns None if no results."""
-    results = load_results(results_file(cloud))
+    results = load_results(results_file())
 
     if not results:
         return None
@@ -216,9 +216,9 @@ def get_metric_value(result: dict, metric: str) -> float:
     return result.get(metric, 0)
 
 
-def results_file(cloud: str) -> Path:
-    """Get results file path for a cloud."""
-    return RESULTS_DIR / f"results_{cloud}.json"
+def results_file() -> Path:
+    """Get results file path."""
+    return RESULTS_DIR / "results.json"
 
 
 @dataclass
@@ -279,10 +279,11 @@ class BenchmarkResult:
     timings: TrialTimings | None = None
 
 
-def config_to_key(config: dict) -> str:
+def config_to_key(config: dict, cloud: str) -> str:
     """Convert config dict to a hashable key for deduplication."""
     return json.dumps(
         {
+            "cloud": cloud,
             "nodes": config["nodes"],
             "cpu_per_node": config["cpu_per_node"],
             "ram_per_node": config["ram_per_node"],
@@ -303,9 +304,9 @@ def find_cached_result(config: dict, cloud: str) -> dict | None:
     - Cached result has 0 throughput (benchmark failed)
     - Cached result is missing required metrics (system_baseline, timings)
     """
-    target_key = config_to_key(config)
-    for result in load_results(results_file(cloud)):
-        if config_to_key(result["config"]) == target_key:
+    target_key = config_to_key(config, cloud)
+    for result in load_results(results_file()):
+        if config_to_key(result["config"], result.get("cloud", "")) == target_key:
             # Skip failed results - they should be retried
             if result.get("error"):
                 return None
@@ -824,7 +825,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(results_file(cloud))
+    results = load_results(results_file())
 
     total_drives = config["nodes"] * config["drives_per_node"]
     cost = calculate_cost(config, cloud_config)
@@ -884,7 +885,7 @@ def save_result(
         }
     )
 
-    save_results(results, results_file(cloud))
+    save_results(results, results_file())
 
 
 def objective(
@@ -1097,7 +1098,7 @@ Examples:
     print(f"Metric: {args.metric} ({METRICS[args.metric]})")
     print(f"Trials: {args.trials}")
     print(f"Terraform dir: {cloud_config.terraform_dir}")
-    print(f"Results file: {results_file(args.cloud)}")
+    print(f"Results file: {results_file()}")
     print(f"Disk types: {cloud_config.disk_types}")
     print(f"Destroy at end: {not args.no_destroy}")
     print()

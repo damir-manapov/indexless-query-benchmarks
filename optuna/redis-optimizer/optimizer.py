@@ -61,7 +61,7 @@ def config_summary(r: dict) -> str:
 
 def format_results(cloud: str) -> dict | None:
     """Format benchmark results for display/export. Returns None if no results."""
-    results = load_results(results_file(cloud))
+    results = load_results(results_file())
 
     if not results:
         return None
@@ -200,9 +200,9 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
     print(f"Results exported to {output_path}")
 
 
-def results_file(cloud: str) -> Path:
-    """Get results file path for a cloud."""
-    return RESULTS_DIR / f"results_{cloud}.json"
+def results_file() -> Path:
+    """Get results file path."""
+    return RESULTS_DIR / "results.json"
 
 
 @dataclass
@@ -232,10 +232,11 @@ class BenchmarkResult:
     error: str | None = None
 
 
-def config_to_key(config: dict) -> str:
+def config_to_key(config: dict, cloud: str) -> str:
     """Convert config dict to a hashable key for deduplication."""
     return json.dumps(
         {
+            "cloud": cloud,
             "mode": config["mode"],
             "cpu_per_node": config["cpu_per_node"],
             "ram_per_node": config["ram_per_node"],
@@ -249,9 +250,9 @@ def config_to_key(config: dict) -> str:
 
 def find_cached_result(config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
-    target_key = config_to_key(config)
-    for result in load_results(results_file(cloud)):
-        if config_to_key(result["config"]) == target_key:
+    target_key = config_to_key(config, cloud)
+    for result in load_results(results_file()):
+        if config_to_key(result["config"], result.get("cloud", "")) == target_key:
             if result.get("error"):
                 return None
             if result.get("ops_per_sec", 0) <= 0:
@@ -479,7 +480,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(results_file(cloud))
+    results = load_results(results_file())
 
     cost = calculate_cost(config, cloud_config)
     cost_efficiency = result.ops_per_sec / cost if cost > 0 else 0
@@ -504,7 +505,7 @@ def save_result(
         }
     )
 
-    save_results(results, results_file(cloud))
+    save_results(results, results_file())
 
 
 def get_metric_value(result: dict, metric: str) -> float:
@@ -679,7 +680,7 @@ Examples:
     print(f"Metric: {args.metric} ({METRICS[args.metric]})")
     print(f"Trials: {args.trials}")
     print(f"Terraform dir: {cloud_config.terraform_dir}")
-    print(f"Results file: {results_file(args.cloud)}")
+    print(f"Results file: {results_file()}")
     print()
 
     # Ensure benchmark VM exists

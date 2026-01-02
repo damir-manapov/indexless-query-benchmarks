@@ -7,8 +7,7 @@ __pycache__/
 .eggs/
 .ruff_cache/
 
-# Results (generated)
-results.json
+# Optuna database (generated)
 study.db
 
 # IDE

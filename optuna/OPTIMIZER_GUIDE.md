@@ -77,38 +77,41 @@ def get_config_search_space() -> dict:
 **Required for all optimizers** to avoid re-running expensive benchmarks:
 
 ```python
-def results_file(cloud: str) -> Path:
+def results_file() -> Path:
     """Return path to JSON results cache."""
-    return Path(__file__).parent / f"results_{cloud.lower()}.json"
+    return Path(__file__).parent / "results.json"
 ```
 
-All optimizers use a single `results_{cloud}.json` file per cloud provider.
-Deduplication is handled by `config_to_key()` which creates a unique hash from the configuration.
+All optimizers use a single `results.json` file.
+Cloud is included in `config_to_key()` to ensure uniqueness across providers.
 
 ```python
-def config_to_key(infra: dict, config: dict) -> str:
-    """Create unique key from config for deduplication."""
-    combined = {**infra, **config}
-    return json.dumps(combined, sort_keys=True)
+def config_to_key(infra: dict, config: dict, cloud: str) -> str:
+    """Create unique key from config for deduplication. Cloud is part of key."""
+    return json.dumps({"cloud": cloud, "infra": infra, "config": config}, sort_keys=True)
 
 def find_cached_result(infra: dict, config: dict, cloud: str) -> dict | None:
     """Search cache for existing result."""
-    key = config_to_key(infra, config)
-    for r in load_results(results_file(cloud)):
-        if config_to_key(r.get("infra", {}), r.get("config", {})) == key:
+    key = config_to_key(infra, config, cloud)
+    for r in load_results(results_file()):
+        cached_key = config_to_key(
+            r.get("infra", {}), r.get("config", {}), r.get("cloud", "")
+        )
+        if cached_key == key:
             if r.get("error") or r.get("throughput", 0) <= 0:
                 continue  # Skip failed results
             return r
     return None
 
-def save_result(cloud: str, infra: dict, config: dict, 
+def save_result(cloud: str, infra: dict, config: dict,
                 result: BenchmarkResult, trial_num: int) -> None:
     """Save benchmark result to cache."""
-    path = results_file(cloud)
+    path = results_file()
     results = load_results(path)
     results.append({
         "trial": trial_num,
         "timestamp": datetime.now().isoformat(),
+        "cloud": cloud,  # Store cloud for key matching
         "infra": infra,
         "config": config,
         "metrics": {
@@ -147,7 +150,7 @@ def ensure_infra(cloud_config: CloudConfig, infra_config: dict) -> tuple[str, st
 ### 6. Benchmark Execution
 
 ```python
-def run_benchmark(benchmark_ip: str, service_ip: str, 
+def run_benchmark(benchmark_ip: str, service_ip: str,
                   config: dict) -> BenchmarkResult:
     """Execute benchmark and return metrics."""
 
@@ -182,7 +185,7 @@ def parse_k6_results(results_json: str) -> BenchmarkResult:
 
         json_content, _ = decoder.raw_decode(content, start_idx)
         metrics = json_content.get("metrics", {})
-        
+
         return BenchmarkResult(
             throughput=metrics.get("http_reqs", {}).get("rate", 0),
             latency_p95_ms=metrics.get("latency_ms", {}).get("p(95)", 0),
@@ -195,7 +198,7 @@ def parse_k6_results(results_json: str) -> BenchmarkResult:
 ### 8. Optuna Objective Function
 
 ```python
-def objective(trial: optuna.Trial, cloud_config: CloudConfig, 
+def objective(trial: optuna.Trial, cloud_config: CloudConfig,
               metric: str, fixed_infra: dict | None = None) -> float:
     """Optuna objective function."""
 
@@ -245,7 +248,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cloud", required=True, choices=["selectel", "timeweb"])
     parser.add_argument("--mode", default="full", choices=["infra", "config", "full"])
-    parser.add_argument("--metric", default="throughput", 
+    parser.add_argument("--metric", default="throughput",
                         choices=["throughput", "p95_ms", "cost_efficiency"])
     parser.add_argument("--trials", type=int, default=20)
     parser.add_argument("--cpu", type=int, help="Fixed CPU (for config mode)")
@@ -293,46 +296,53 @@ def main():
 
 ## Optimization Modes
 
-| Mode | Infrastructure | Config | Use Case |
-|------|---------------|--------|----------|
-| `infra` | Variable | Fixed | Find best VM specs |
-| `config` | Fixed | Variable | Tune service parameters |
-| `full` | Variable | Variable | Complete optimization |
+| Mode     | Infrastructure | Config   | Use Case                |
+| -------- | -------------- | -------- | ----------------------- |
+| `infra`  | Variable       | Fixed    | Find best VM specs      |
+| `config` | Fixed          | Variable | Tune service parameters |
+| `full`   | Variable       | Variable | Complete optimization   |
 
 ## Common Pitfalls
 
 ### 1. JSON Parsing
+
 Always use `json.JSONDecoder().raw_decode()` for k6 output - it may have extra data after the JSON.
 
 ### 2. SSH Timeouts
+
 Long-running benchmarks need increased timeouts:
+
 ```python
 run_ssh_command(vm_ip, cmd, timeout=600)  # 10 minutes for benchmarks
 ```
 
 ### 3. Stale Terraform State
+
 VMs may be deleted externally. Always validate before reusing:
+
 ```python
 if current_ip and validate_vm_exists(current_ip):
     # VM exists, can reuse
 ```
 
 ### 4. Pruned Trials
+
 Infrastructure failures should prune the trial, not crash:
+
 ```python
 raise optuna.TrialPruned()  # Not raise RuntimeError
 ```
 
 ## Shared Utilities (common.py)
 
-| Function | Purpose |
-|----------|---------|
-| `run_ssh_command()` | Execute command on remote VM |
-| `wait_for_vm_ready()` | Wait for cloud-init completion |
-| `get_terraform()` | Get initialized Terraform instance |
-| `get_tf_output()` | Get Terraform output value |
-| `destroy_all()` | Destroy all Terraform resources |
-| `load_results()` / `save_results()` | JSON cache I/O |
+| Function                            | Purpose                            |
+| ----------------------------------- | ---------------------------------- |
+| `run_ssh_command()`                 | Execute command on remote VM       |
+| `wait_for_vm_ready()`               | Wait for cloud-init completion     |
+| `get_terraform()`                   | Get initialized Terraform instance |
+| `get_tf_output()`                   | Get Terraform output value         |
+| `destroy_all()`                     | Destroy all Terraform resources    |
+| `load_results()` / `save_results()` | JSON cache I/O                     |
 
 ## Checklist for New Optimizer
 

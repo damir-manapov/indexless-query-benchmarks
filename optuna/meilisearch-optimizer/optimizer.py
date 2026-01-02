@@ -436,25 +436,29 @@ MEILI_MAX_INDEXING_THREADS={max_threads if max_threads > 0 else "auto"}
     return wait_for_meilisearch_ready(meili_ip, timeout=60, jump_host=jump_host)
 
 
-def results_file(cloud: str) -> Path:
-    """Get results file path for a cloud."""
-    return RESULTS_DIR / f"results_{cloud}.json"
+def results_file() -> Path:
+    """Get results file path."""
+    return RESULTS_DIR / "results.json"
 
 
-def config_to_key(infra: dict, meili_config: dict) -> str:
+def config_to_key(infra: dict, meili_config: dict, cloud: str) -> str:
     """Convert config dicts to a hashable key for deduplication."""
-    return json.dumps({"infra": infra, "meili": meili_config}, sort_keys=True)
+    return json.dumps(
+        {"cloud": cloud, "infra": infra, "meili": meili_config}, sort_keys=True
+    )
 
 
 def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
-    target_key = config_to_key(infra, meili_config)
+    target_key = config_to_key(infra, meili_config, cloud)
 
-    rf = results_file(cloud)
+    rf = results_file()
     if not rf.exists():
         return None
     for result in load_results(rf):
-        result_key = config_to_key(result.get("infra", {}), result.get("config", {}))
+        result_key = config_to_key(
+            result.get("infra", {}), result.get("config", {}), result.get("cloud", "")
+        )
         if result_key == target_key:
             if result.get("error"):
                 continue  # Skip errored, try next
@@ -484,7 +488,7 @@ def save_result(
     indexing_time: float = 0,
 ):
     """Save benchmark result."""
-    rf = results_file(cloud)
+    rf = results_file()
     results = load_results(rf)
 
     results.append(

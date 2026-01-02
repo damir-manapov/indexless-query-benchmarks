@@ -8,7 +8,7 @@ Bayesian optimization for finding the best Meilisearch configuration using Optun
 2. **Terraform deploys** Meilisearch VM
 3. **Dataset indexed** - 500K synthetic e-commerce products
 4. **k6 runs** search benchmark with realistic query patterns
-5. **Results logged** to `results_{cloud}.json`
+5. **Results logged** to `results.json`
 6. **Optuna learns** and suggests next config
 
 ## Optimization Modes

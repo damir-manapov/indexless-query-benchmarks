@@ -99,22 +99,24 @@ class BenchmarkResult:
     error: str | None = None
 
 
-def results_file(cloud: str) -> Path:
-    """Get results file path for a cloud."""
-    return RESULTS_DIR / f"results_{cloud}.json"
+def results_file() -> Path:
+    """Get results file path."""
+    return RESULTS_DIR / "results.json"
 
 
-def config_to_key(infra: dict, pg_config: dict) -> str:
+def config_to_key(infra: dict, pg_config: dict, cloud: str) -> str:
     """Convert config dicts to a hashable key for deduplication."""
-    return json.dumps({"infra": infra, "pg": pg_config}, sort_keys=True)
+    return json.dumps({"cloud": cloud, "infra": infra, "pg": pg_config}, sort_keys=True)
 
 
 def find_cached_result(infra: dict, pg_config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
-    target_key = config_to_key(infra, pg_config)
-    for result in load_results(results_file(cloud)):
+    target_key = config_to_key(infra, pg_config, cloud)
+    for result in load_results(results_file()):
         result_key = config_to_key(
-            result.get("infra_config", {}), result.get("pg_config", {})
+            result.get("infra_config", {}),
+            result.get("pg_config", {}),
+            result.get("cloud", ""),
         )
         if result_key == target_key:
             if result.get("error"):
@@ -511,7 +513,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(results_file(cloud))
+    results = load_results(results_file())
 
     cost = calculate_cost(infra_config, cloud_config)
     cost_efficiency = result.tps / cost if cost > 0 else 0
@@ -535,7 +537,7 @@ def save_result(
         }
     )
 
-    save_results(results, results_file(cloud))
+    save_results(results, results_file())
 
 
 def get_metric_value(result: dict, metric: str) -> float:
@@ -558,7 +560,7 @@ def pg_summary(c: dict) -> str:
 
 def format_results(cloud: str, mode: str) -> dict | None:
     """Format benchmark results for display."""
-    results = load_results(results_file(cloud))
+    results = load_results(results_file())
     if not results:
         return None
 
