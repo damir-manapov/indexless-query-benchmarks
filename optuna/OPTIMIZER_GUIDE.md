@@ -263,7 +263,7 @@ def main():
     cloud_config = get_cloud_config(args.cloud)
 
     if args.show_results:
-        show_results(args.cloud, args.mode)
+        show_results(args.cloud)
         return
 
     if args.destroy:
