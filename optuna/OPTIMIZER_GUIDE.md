@@ -10,8 +10,8 @@ optuna/
 ├── {service}-optimizer/
 │   ├── optimizer.py       # Main optimizer script
 │   ├── benchmark.js       # k6 benchmark script (if HTTP-based)
+│   ├── study.db           # Optuna study database (per service)
 │   └── README.md          # Service-specific documentation
-└── study.db               # Shared Optuna study database
 ```
 
 ## Required Components
