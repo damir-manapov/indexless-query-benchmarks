@@ -268,8 +268,9 @@ def main():
         return
 
     # Create/load Optuna study
+    # Include metric in study name to prevent direction mismatch when reusing study
     storage = f"sqlite:///{Path(__file__).parent}/study.db"
-    study_name = f"{SERVICE_NAME}-{args.cloud}-{args.mode}"
+    study_name = f"{SERVICE_NAME}-{args.cloud}-{args.mode}-{args.metric}"
 
     direction = "maximize" if args.metric == "throughput" else "minimize"
     study = optuna.create_study(
