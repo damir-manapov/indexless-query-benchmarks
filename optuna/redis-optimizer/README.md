@@ -7,7 +7,7 @@ Bayesian optimization for finding the best Redis configuration using Optuna.
 1. **Optuna suggests** a configuration (mode, CPU, RAM, eviction policy, io-threads, persistence)
 2. **Terraform deploys** Redis single-node or Sentinel cluster
 3. **memtier_benchmark** runs workload (80% GET, 20% SET)
-4. **Results logged** to `results_{cloud}.json`
+4. **Results logged** to `results_{cloud}_infra.json`
 5. **Optuna learns** from results and suggests the next config
 6. **Repeat** until trials exhausted
 
@@ -55,7 +55,7 @@ cd terraform/selectel
 terraform destroy -auto-approve
 rm -f terraform.tfstate terraform.tfstate.backup
 cd ../../optuna
-rm -f redis-optimizer/study.db redis-optimizer/results_selectel.json
+rm -f redis-optimizer/study.db redis-optimizer/results_selectel_infra.json
 
 # Run - it will create everything from scratch
 uv run python redis-optimizer/optimizer.py --cloud selectel --trials 5

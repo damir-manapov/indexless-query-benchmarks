@@ -7,7 +7,7 @@ Bayesian optimization for finding the best MinIO cluster configuration using Opt
 1. **Optuna suggests** a configuration (CPU, RAM, drives, drive type)
 2. **Terraform deploys** the MinIO cluster with that config
 3. **Warp benchmarks** the cluster
-4. **Results logged** to `results_{cloud}.json`
+4. **Results logged** to `results_{cloud}_infra.json`
 5. **Optuna learns** from results and suggests the next config
 6. **Repeat** until trials exhausted
 
@@ -62,7 +62,7 @@ cd terraform/selectel
 terraform destroy -auto-approve
 rm -f terraform.tfstate terraform.tfstate.backup
 cd ../../optuna
-rm -f minio-optimizer/study.db minio-optimizer/results_selectel.json
+rm -f minio-optimizer/study.db minio-optimizer/results_selectel_infra.json
 
 # Run - it will create everything from scratch
 uv run python minio-optimizer/optimizer.py --cloud selectel --trials 5
@@ -118,7 +118,7 @@ Best found: **1 node, 4 CPU, 32GB RAM, 4×100GB universal** → 412 MiB/s @ $7.2
 
 ## Output
 
-Results are saved to `results_{cloud}.json` (e.g., `results_selectel.json`):
+Results are saved to `results_{cloud}_infra.json` (e.g., `results_selectel_infra.json`):
 
 ```json
 [
