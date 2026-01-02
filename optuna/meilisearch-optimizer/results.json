@@ -16,5 +16,107 @@
     "indexing_time_s": 18.337809324264526,
     "error": null,
     "cloud": "selectel"
+  },
+  {
+    "trial": 13,
+    "timestamp": "2026-01-02T21:23:45.634739",
+    "infra": {
+      "cpu": 2,
+      "ram_gb": 16,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "qps": 328.1690670486047,
+    "p50_ms": 1,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 24.337985515594482,
+    "error": null
+  },
+  {
+    "trial": 31,
+    "timestamp": "2026-01-02T22:26:56.426840",
+    "infra": {
+      "cpu": 8,
+      "ram_gb": 4,
+      "disk_type": "universal"
+    },
+    "config": {},
+    "qps": 1265.4192609041668,
+    "p50_ms": 2,
+    "p95_ms": 4,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 12.395586252212524,
+    "error": null
+  },
+  {
+    "trial": 34,
+    "timestamp": "2026-01-02T22:42:19.617077",
+    "infra": {
+      "cpu": 2,
+      "ram_gb": 16,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "qps": 322.30761172598284,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 26.405429363250732,
+    "error": null
+  },
+  {
+    "trial": 35,
+    "timestamp": "2026-01-02T23:01:44.365854",
+    "infra": {
+      "cpu": 2,
+      "ram_gb": 16,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "qps": 322.6609520788444,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 23.47845458984375,
+    "error": null
+  },
+  {
+    "trial": 39,
+    "timestamp": "2026-01-03T00:03:00.933310",
+    "infra": {
+      "cpu": 2,
+      "ram_gb": 16,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "qps": 315.53734574224165,
+    "p50_ms": 2,
+    "p95_ms": 4,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 26.855846881866455,
+    "error": null
+  },
+  {
+    "trial": 40,
+    "timestamp": "2026-01-03T00:18:08.969371",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 32,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "qps": 640.3863891436533,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 16.07616114616394,
+    "error": null
   }
 ]

@@ -294,6 +294,58 @@ def main():
             destroy_all(cloud_config.terraform_dir, cloud_config.name)
 ```
 
+### 10. Results Display and Export
+
+All optimizers should provide console display and markdown export:
+
+```python
+def config_summary(r: dict) -> str:
+    """Format config as a compact string for display."""
+    infra = r.get("infra", {})
+    return f"{infra.get('cpu', 0)}cpu/{infra.get('ram_gb', 0)}gb"
+
+
+def format_results(cloud: str) -> dict | None:
+    """Structure results for display/export. Returns None if no results."""
+    results = load_results(results_file())
+    results = [r for r in results if r.get("cloud", "") == cloud]
+    if not results:
+        return None
+
+    # Sort by primary metric, extract rows, find best configs
+    return {"cloud": cloud, "rows": [...], "best": {...}}
+
+
+def show_results(cloud: str) -> None:
+    """Display results table to console."""
+    data = format_results(cloud)
+    if not data:
+        print(f"No results found for {cloud}")
+        return
+    # Print formatted table
+
+
+def export_results_md(cloud: str, output_path: Path | None = None) -> None:
+    """Export results to RESULTS_{CLOUD}.md markdown file."""
+    data = format_results(cloud)
+    if not data:
+        return
+
+    if output_path is None:
+        output_path = RESULTS_DIR / f"RESULTS_{cloud.upper()}.md"
+
+    lines = [
+        f"# {SERVICE_NAME} Benchmark Results - {cloud.upper()}",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Results",
+        "| # | ... |",  # Table header
+        "|--:|...|",    # Alignment
+    ]
+    # Add rows and best configs
+    output_path.write_text("\n".join(lines))
+```
+
 ## Optimization Modes
 
 | Mode     | Infrastructure | Config   | Use Case                |

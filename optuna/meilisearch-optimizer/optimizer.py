@@ -96,7 +96,7 @@ class BenchmarkResult:
 
 
 def wait_for_meilisearch_ready(
-    vm_ip: str, timeout: int = 180, jump_host: str | None = None
+    vm_ip: str, timeout: int = 300, jump_host: str | None = None
 ) -> bool:
     """Wait for Meilisearch to be healthy."""
     print("  Waiting for Meilisearch to be ready...")
@@ -495,6 +495,7 @@ def save_result(
         {
             "trial": trial_num,
             "timestamp": datetime.now().isoformat(),
+            "cloud": cloud,
             "infra": infra_config,
             "config": meili_config,
             "qps": result.qps,
@@ -508,6 +509,164 @@ def save_result(
     )
 
     save_results(results, rf)
+
+
+def config_summary(r: dict) -> str:
+    """Format config as a compact string."""
+    infra = r.get("infra", {})
+    cfg = r.get("config", {})
+    infra_str = f"{infra.get('cpu', 0)}cpu/{infra.get('ram_gb', 0)}gb/{infra.get('disk_type', '?')}"
+    if cfg:
+        cfg_str = f" mem={cfg.get('max_indexing_memory_mb', 0)}mb thr={cfg.get('max_indexing_threads', 0)}"
+        return infra_str + cfg_str
+    return infra_str
+
+
+def format_results(cloud: str) -> dict | None:
+    """Format benchmark results for display/export. Returns None if no results."""
+    results = load_results(results_file())
+
+    # Filter by cloud
+    results = [r for r in results if r.get("cloud", "") == cloud]
+
+    if not results:
+        return None
+
+    results_sorted = sorted(results, key=lambda x: x.get("qps", 0), reverse=True)
+
+    rows = []
+    for r in results_sorted:
+        infra = r.get("infra", {})
+        cfg = r.get("config", {})
+        rows.append(
+            {
+                "cpu": infra.get("cpu", 0),
+                "ram": infra.get("ram_gb", 0),
+                "disk": infra.get("disk_type", "?"),
+                "mem_mb": cfg.get("max_indexing_memory_mb", 0),
+                "threads": cfg.get("max_indexing_threads", 0),
+                "qps": r.get("qps", 0),
+                "p50": r.get("p50_ms", 0),
+                "p95": r.get("p95_ms", 0),
+                "p99": r.get("p99_ms", 0),
+                "idx_time": r.get("indexing_time_s", 0),
+            }
+        )
+
+    best_qps = max(results, key=lambda x: x.get("qps", 0))
+    best_p95 = min(
+        [r for r in results if r.get("p95_ms", float("inf")) > 0],
+        key=lambda x: x.get("p95_ms", float("inf")),
+        default=best_qps,
+    )
+    best_idx = min(
+        [r for r in results if r.get("indexing_time_s", 0) > 0],
+        key=lambda x: x.get("indexing_time_s", float("inf")),
+        default=best_qps,
+    )
+
+    return {
+        "cloud": cloud,
+        "rows": rows,
+        "best": {
+            "qps": {
+                "value": best_qps.get("qps", 0),
+                "config": config_summary(best_qps),
+            },
+            "p95": {
+                "value": best_p95.get("p95_ms", 0),
+                "config": config_summary(best_p95),
+            },
+            "indexing": {
+                "value": best_idx.get("indexing_time_s", 0),
+                "config": config_summary(best_idx),
+            },
+        },
+    }
+
+
+def show_results(cloud: str) -> None:
+    """Display all benchmark results for a cloud in a table format."""
+    data = format_results(cloud)
+
+    if not data:
+        print(f"No results found for {cloud}")
+        return
+
+    print(f"\n{'=' * 100}")
+    print(f"Meilisearch Benchmark Results - {cloud.upper()}")
+    print(f"{'=' * 100}")
+
+    print(
+        f"{'#':>3} {'CPU':>4} {'RAM':>4} {'Disk':<9} {'Mem MB':>7} {'Thr':>4} "
+        f"{'QPS':>8} {'p50':>7} {'p95':>7} {'p99':>7} {'Idx(s)':>8}"
+    )
+    print("-" * 100)
+
+    for i, r in enumerate(data["rows"], 1):
+        print(
+            f"{i:>3} {r['cpu']:>4} {r['ram']:>4} {r['disk']:<9} {r['mem_mb']:>7} {r['threads']:>4} "
+            f"{r['qps']:>8.1f} {r['p50']:>7.1f} {r['p95']:>7.1f} {r['p99']:>7.1f} {r['idx_time']:>8.1f}"
+        )
+
+    print("-" * 100)
+    print(f"Total: {len(data['rows'])} results")
+
+    best = data["best"]
+    print(
+        f"\nBest by QPS:      {best['qps']['value']:>8.1f} {'QPS':<6} [{best['qps']['config']}]"
+    )
+    print(
+        f"Best by p95:      {best['p95']['value']:>8.1f} {'ms':<6} [{best['p95']['config']}]"
+    )
+    print(
+        f"Best by indexing: {best['indexing']['value']:>8.1f} {'sec':<6} [{best['indexing']['config']}]"
+    )
+
+
+def export_results_md(cloud: str, output_path: Path | None = None) -> None:
+    """Export benchmark results to a markdown file."""
+    data = format_results(cloud)
+
+    if not data:
+        print(f"No results found for {cloud}")
+        return
+
+    if output_path is None:
+        output_path = RESULTS_DIR / f"RESULTS_{cloud.upper()}.md"
+
+    lines = [
+        f"# Meilisearch Benchmark Results - {cloud.upper()}",
+        "",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "## Results",
+        "",
+        "| # | CPU | RAM | Disk | Mem MB | Thr | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Idx (s) |",
+        "|--:|----:|----:|------|-------:|----:|----:|---------:|---------:|---------:|--------:|",
+    ]
+
+    for i, r in enumerate(data["rows"], 1):
+        lines.append(
+            f"| {i} | {r['cpu']} | {r['ram']} | {r['disk']} | {r['mem_mb']} | {r['threads']} | "
+            f"{r['qps']:.1f} | {r['p50']:.1f} | {r['p95']:.1f} | {r['p99']:.1f} | {r['idx_time']:.1f} |"
+        )
+
+    best = data["best"]
+    lines.extend(
+        [
+            "",
+            "## Best Configurations",
+            "",
+            f"- **Best by QPS:** {best['qps']['value']:.1f} QPS — `{best['qps']['config']}`",
+            f"- **Best by p95 latency:** {best['p95']['value']:.1f}ms — `{best['p95']['config']}`",
+            f"- **Best by indexing time:** {best['indexing']['value']:.1f}s — `{best['indexing']['config']}`",
+            "",
+        ]
+    )
+
+    output_path.write_text("\n".join(lines))
+    print(f"Results exported to {output_path}")
 
 
 def objective_infra(
@@ -711,13 +870,8 @@ def main():
     print(f"Trials: {args.trials}")
 
     if args.show_results:
-        results_file = RESULTS_DIR / f"results_{args.cloud}_{args.mode}.json"
-        if results_file.exists():
-            results = load_results(results_file)
-            for r in results[-10:]:
-                print(
-                    f"Trial {r['trial']}: {r.get('qps', 0):.1f} QPS, p95={r.get('p95_ms', 0):.1f}ms"
-                )
+        show_results(args.cloud)
+        export_results_md(args.cloud)
         return
 
     try:

@@ -52,7 +52,7 @@ def run_ssh_command(
 
 
 def wait_for_vm_ready(
-    vm_ip: str, timeout: int = 300, jump_host: str | None = None
+    vm_ip: str, timeout: int = 600, jump_host: str | None = None
 ) -> bool:
     """Wait for benchmark VM to be ready (cloud-init complete)."""
     print(f"  Waiting for VM {vm_ip} to be ready...")
