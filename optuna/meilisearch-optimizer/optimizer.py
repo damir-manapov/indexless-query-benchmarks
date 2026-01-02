@@ -877,7 +877,7 @@ def main():
     try:
         if args.mode == "infra":
             study = optuna.create_study(
-                study_name=f"meilisearch-{args.cloud}-infra",
+                study_name=f"meilisearch-{args.cloud}-infra-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction=direction,
@@ -905,7 +905,7 @@ def main():
             upload_and_index_dataset(benchmark_ip, meili_ip)
 
             study = optuna.create_study(
-                study_name=f"meilisearch-{args.cloud}-config",
+                study_name=f"meilisearch-{args.cloud}-config-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction=direction,
@@ -934,7 +934,7 @@ def main():
             )
 
             study_infra = optuna.create_study(
-                study_name=f"meilisearch-{args.cloud}-full-infra",
+                study_name=f"meilisearch-{args.cloud}-full-infra-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction=direction,
@@ -968,7 +968,7 @@ def main():
             upload_and_index_dataset(benchmark_ip, meili_ip)
 
             study_config = optuna.create_study(
-                study_name=f"meilisearch-{args.cloud}-full-config",
+                study_name=f"meilisearch-{args.cloud}-full-config-{args.metric}",
                 storage=f"sqlite:///{STUDY_DB}",
                 load_if_exists=True,
                 direction=direction,
