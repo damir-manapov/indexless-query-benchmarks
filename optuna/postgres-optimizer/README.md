@@ -7,7 +7,7 @@ Bayesian optimization for finding the best PostgreSQL configuration using Optuna
 1. **Optuna suggests** a configuration (mode, CPU, RAM, shared_buffers, work_mem, etc.)
 2. **Terraform deploys** PostgreSQL single-node or Patroni cluster
 3. **pgbench** runs TPC-B-like workload
-4. **Results logged** to `results_{cloud}_{mode}.json`
+4. **Results logged** to `results_{cloud}.json`
 5. **Optuna learns** from results and suggests the next config
 6. **Repeat** until trials exhausted
 
@@ -66,7 +66,7 @@ cd terraform/timeweb
 terraform destroy -auto-approve
 rm -f terraform.tfstate terraform.tfstate.backup
 cd ../../optuna
-rm -f postgres-optimizer/study.db postgres-optimizer/results_timeweb_infra.json
+rm -f postgres-optimizer/study.db postgres-optimizer/results_timeweb.json
 
 # Run - it will create everything from scratch
 uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode config --trials 5

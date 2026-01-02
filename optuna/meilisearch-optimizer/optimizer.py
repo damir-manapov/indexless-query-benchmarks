@@ -436,9 +436,9 @@ MEILI_MAX_INDEXING_THREADS={max_threads if max_threads > 0 else "auto"}
     return wait_for_meilisearch_ready(meili_ip, timeout=60, jump_host=jump_host)
 
 
-def results_file(cloud: str, mode: str) -> Path:
-    """Get results file path for a cloud and mode."""
-    return RESULTS_DIR / f"results_{cloud}_{mode}.json"
+def results_file(cloud: str) -> Path:
+    """Get results file path for a cloud."""
+    return RESULTS_DIR / f"results_{cloud}.json"
 
 
 def config_to_key(infra: dict, meili_config: dict) -> str:
@@ -446,31 +446,21 @@ def config_to_key(infra: dict, meili_config: dict) -> str:
     return json.dumps({"infra": infra, "meili": meili_config}, sort_keys=True)
 
 
-def find_cached_result(
-    infra: dict, meili_config: dict, cloud: str, mode: str
-) -> dict | None:
-    """Find a cached successful result for the given config.
-
-    Searches across all modes (infra, config, full) to maximize cache hits.
-    """
+def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | None:
+    """Find a cached successful result for the given config."""
     target_key = config_to_key(infra, meili_config)
 
-    # Search all modes for cached results
-    all_modes = ["infra", "config", "full"]
-    for search_mode in all_modes:
-        rf = results_file(cloud, search_mode)
-        if not rf.exists():
-            continue
-        for result in load_results(rf):
-            result_key = config_to_key(
-                result.get("infra", {}), result.get("config", {})
-            )
-            if result_key == target_key:
-                if result.get("error"):
-                    continue  # Skip errored, try next
-                if result.get("qps", 0) <= 0:
-                    continue  # Skip failed, try next
-                return result
+    rf = results_file(cloud)
+    if not rf.exists():
+        return None
+    for result in load_results(rf):
+        result_key = config_to_key(result.get("infra", {}), result.get("config", {}))
+        if result_key == target_key:
+            if result.get("error"):
+                continue  # Skip errored, try next
+            if result.get("qps", 0) <= 0:
+                continue  # Skip failed, try next
+            return result
     return None
 
 
@@ -490,12 +480,11 @@ def save_result(
     meili_config: dict,
     trial_num: int,
     cloud: str,
-    mode: str,
     cloud_config: CloudConfig,
     indexing_time: float = 0,
 ):
     """Save benchmark result."""
-    rf = results_file(cloud, mode)
+    rf = results_file(cloud)
     results = load_results(rf)
 
     results.append(
@@ -537,7 +526,7 @@ def objective_infra(
     print(f"{'=' * 60}")
 
     # Check cache
-    cached = find_cached_result(infra_config, {}, cloud, "infra")
+    cached = find_cached_result(infra_config, {}, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
@@ -575,7 +564,6 @@ def objective_infra(
         {},
         trial.number,
         cloud,
-        "infra",
         cloud_config,
         indexing_time,
     )
@@ -615,7 +603,7 @@ def objective_config(
     print(f"{'=' * 60}")
 
     # Check cache
-    cached = find_cached_result(infra_config, config, cloud, "config")
+    cached = find_cached_result(infra_config, config, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
@@ -656,7 +644,6 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
         config,
         trial.number,
         cloud,
-        "config",
         cloud_config,
         indexing_time,
     )

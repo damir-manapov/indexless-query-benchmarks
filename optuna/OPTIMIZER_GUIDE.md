@@ -77,21 +77,13 @@ def get_config_search_space() -> dict:
 **Required for all optimizers** to avoid re-running expensive benchmarks:
 
 ```python
-def results_file(cloud: str, mode: str = "infra") -> Path:
+def results_file(cloud: str) -> Path:
     """Return path to JSON results cache."""
-    return Path(__file__).parent / f"results_{cloud.lower()}_{mode}.json"
+    return Path(__file__).parent / f"results_{cloud.lower()}.json"
 ```
 
-All optimizers use consistent `results_{cloud}_{mode}.json` naming:
-
-| Optimizer | Available Modes | Default Mode |
-|-----------|-----------------|--------------|
-| meilisearch | infra/config/full | infra |
-| postgres | infra/config/full | infra |
-| minio | infra | infra |
-| redis | infra | infra |
-
-MinIO and Redis currently only implement infra mode (all parameters require VM changes).
+All optimizers use a single `results_{cloud}.json` file per cloud provider.
+Deduplication is handled by `config_to_key()` which creates a unique hash from the configuration.
 
 ```python
 def config_to_key(infra: dict, config: dict) -> str:
@@ -99,24 +91,20 @@ def config_to_key(infra: dict, config: dict) -> str:
     combined = {**infra, **config}
     return json.dumps(combined, sort_keys=True)
 
-def find_cached_result(
-    infra: dict, config: dict, cloud: str, mode: str
-) -> dict | None:
-    """Search cache for existing result. Check ALL modes for cross-mode hits."""
+def find_cached_result(infra: dict, config: dict, cloud: str) -> dict | None:
+    """Search cache for existing result."""
     key = config_to_key(infra, config)
-
-    # Search across all modes (results from infra mode can be used in config mode)
-    for search_mode in ["infra", "config", "full"]:
-        results = load_results(results_file(cloud, search_mode))
-        for r in results:
-            if config_to_key(r.get("infra", {}), r.get("config", {})) == key:
-                return r
+    for r in load_results(results_file(cloud)):
+        if config_to_key(r.get("infra", {}), r.get("config", {})) == key:
+            if r.get("error") or r.get("throughput", 0) <= 0:
+                continue  # Skip failed results
+            return r
     return None
 
-def save_result(cloud: str, mode: str, infra: dict, config: dict, 
+def save_result(cloud: str, infra: dict, config: dict, 
                 result: BenchmarkResult, trial_num: int) -> None:
     """Save benchmark result to cache."""
-    path = results_file(cloud, mode)
+    path = results_file(cloud)
     results = load_results(path)
     results.append({
         "trial": trial_num,
@@ -329,10 +317,7 @@ if current_ip and validate_vm_exists(current_ip):
     # VM exists, can reuse
 ```
 
-### 4. Cross-Mode Caching
-Results from one mode should be usable in another. Search all modes in `find_cached_result()`.
-
-### 5. Pruned Trials
+### 4. Pruned Trials
 Infrastructure failures should prune the trial, not crash:
 ```python
 raise optuna.TrialPruned()  # Not raise RuntimeError
@@ -360,5 +345,4 @@ raise optuna.TrialPruned()  # Not raise RuntimeError
 - [ ] `parse_*_output()` with error handling
 - [ ] `objective_infra()` and `objective_config()` (or single `objective()`)
 - [ ] CLI with `--cloud`, `--mode`, `--metric`, `--trials`, `--show-results`, `--destroy`
-- [ ] Cross-mode cache search
 - [ ] Trial pruning on failures

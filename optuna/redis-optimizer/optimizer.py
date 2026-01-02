@@ -200,9 +200,9 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
     print(f"Results exported to {output_path}")
 
 
-def results_file(cloud: str, mode: str = "infra") -> Path:
-    """Get results file path for a cloud and mode."""
-    return RESULTS_DIR / f"results_{cloud}_{mode}.json"
+def results_file(cloud: str) -> Path:
+    """Get results file path for a cloud."""
+    return RESULTS_DIR / f"results_{cloud}.json"
 
 
 @dataclass

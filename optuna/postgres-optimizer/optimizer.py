@@ -99,9 +99,9 @@ class BenchmarkResult:
     error: str | None = None
 
 
-def results_file(cloud: str, mode: str) -> Path:
-    """Get results file path for a cloud and mode."""
-    return RESULTS_DIR / f"results_{cloud}_{mode}.json"
+def results_file(cloud: str) -> Path:
+    """Get results file path for a cloud."""
+    return RESULTS_DIR / f"results_{cloud}.json"
 
 
 def config_to_key(infra: dict, pg_config: dict) -> str:
@@ -109,12 +109,10 @@ def config_to_key(infra: dict, pg_config: dict) -> str:
     return json.dumps({"infra": infra, "pg": pg_config}, sort_keys=True)
 
 
-def find_cached_result(
-    infra: dict, pg_config: dict, cloud: str, mode: str
-) -> dict | None:
+def find_cached_result(infra: dict, pg_config: dict, cloud: str) -> dict | None:
     """Find a cached successful result for the given config."""
     target_key = config_to_key(infra, pg_config)
-    for result in load_results(results_file(cloud, mode)):
+    for result in load_results(results_file(cloud)):
         result_key = config_to_key(
             result.get("infra_config", {}), result.get("pg_config", {})
         )
@@ -513,7 +511,7 @@ def save_result(
     cloud_config: CloudConfig,
 ) -> None:
     """Save benchmark result to JSON file."""
-    results = load_results(results_file(cloud, mode))
+    results = load_results(results_file(cloud))
 
     cost = calculate_cost(infra_config, cloud_config)
     cost_efficiency = result.tps / cost if cost > 0 else 0
@@ -537,7 +535,7 @@ def save_result(
         }
     )
 
-    save_results(results, results_file(cloud, mode))
+    save_results(results, results_file(cloud))
 
 
 def get_metric_value(result: dict, metric: str) -> float:
@@ -560,7 +558,7 @@ def pg_summary(c: dict) -> str:
 
 def format_results(cloud: str, mode: str) -> dict | None:
     """Format benchmark results for display."""
-    results = load_results(results_file(cloud, mode))
+    results = load_results(results_file(cloud))
     if not results:
         return None
 
@@ -736,7 +734,7 @@ def objective_infra(
     print(f"{'=' * 60}")
 
     # Check cache
-    cached = find_cached_result(infra_config, pg_config, cloud, "infra")
+    cached = find_cached_result(infra_config, pg_config, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
@@ -847,7 +845,7 @@ def objective_config(
     print(f"{'=' * 60}")
 
     # Check cache
-    cached = find_cached_result(infra_config, pg_config, cloud, "config")
+    cached = find_cached_result(infra_config, pg_config, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
