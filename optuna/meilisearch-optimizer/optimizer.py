@@ -293,23 +293,14 @@ k6 run /tmp/benchmark.js \\
         return BenchmarkResult(error="Failed to get k6 results")
 
     try:
-        # Debug: print first 200 chars of output
-        print(f"  k6 results (first 200 chars): {results_json[:200]!r}")
+        # Use raw_decode to extract first JSON object (handles extra data after JSON)
+        decoder = json.JSONDecoder()
+        content = results_json.strip()
+        start_idx = content.find("{")
+        if start_idx == -1:
+            return BenchmarkResult(error="No JSON found in k6 results")
 
-        # Find valid JSON in output - might have warnings/logs mixed in
-        json_content = None
-        for line in results_json.strip().split("\n"):
-            line = line.strip()
-            if line.startswith("{") and line.endswith("}"):
-                try:
-                    json_content = json.loads(line)
-                    break
-                except json.JSONDecodeError:
-                    continue
-
-        if json_content is None:
-            # Try parsing entire content
-            json_content = json.loads(results_json.strip())
+        json_content, _ = decoder.raw_decode(content, start_idx)
 
         # Extract metrics from parsed JSON
         metrics = json_content.get("metrics", {})
