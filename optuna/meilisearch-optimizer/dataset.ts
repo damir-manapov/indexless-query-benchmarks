@@ -72,16 +72,8 @@ const PRODUCT_TEMPLATES: Record<string, string[]> = {
     "{brand} Notebook {adj} {num}",
     "{brand} {adj} Book {num}",
   ],
-  Smartphones: [
-    "{brand} Phone {adj} {num}",
-    "{brand} {adj} {num}",
-    "{brand} Mobile {adj} {num}",
-  ],
-  Tablets: [
-    "{brand} Tab {adj} {num}",
-    "{brand} Pad {adj} {num}",
-    "{brand} {adj} Tablet {num}",
-  ],
+  Smartphones: ["{brand} Phone {adj} {num}", "{brand} {adj} {num}", "{brand} Mobile {adj} {num}"],
+  Tablets: ["{brand} Tab {adj} {num}", "{brand} Pad {adj} {num}", "{brand} {adj} Tablet {num}"],
   Headphones: [
     "{brand} {adj} Buds {num}",
     "{brand} {adj} Headphones",
@@ -92,26 +84,14 @@ const PRODUCT_TEMPLATES: Record<string, string[]> = {
     "{brand} {adj} DSLR {num}",
     "{brand} Mirrorless {adj} {num}",
   ],
-  TVs: [
-    '{brand} {num}" {adj} TV',
-    '{brand} {adj} {num}" Smart TV',
-    '{brand} OLED {num}" {adj}',
-  ],
-  Gaming: [
-    "{brand} {adj} Controller",
-    "{brand} Gaming {adj} {num}",
-    "{brand} {adj} Console",
-  ],
+  TVs: ['{brand} {num}" {adj} TV', '{brand} {adj} {num}" Smart TV', '{brand} OLED {num}" {adj}'],
+  Gaming: ["{brand} {adj} Controller", "{brand} Gaming {adj} {num}", "{brand} {adj} Console"],
   Wearables: [
     "{brand} Watch {adj} {num}",
     "{brand} {adj} Band {num}",
     "{brand} Fitness {adj} {num}",
   ],
-  Audio: [
-    "{brand} {adj} Speaker",
-    "{brand} Soundbar {adj}",
-    "{brand} {adj} Home Audio",
-  ],
+  Audio: ["{brand} {adj} Speaker", "{brand} Soundbar {adj}", "{brand} {adj} Home Audio"],
   Accessories: [
     "{brand} {adj} Charger",
     "{brand} {adj} Cable",

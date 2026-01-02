@@ -171,7 +171,7 @@ def reconfigure_postgres(
     jump_host: str | None = None,
 ) -> bool:
     """Reconfigure Postgres with new settings (no VM recreation).
-    
+
     Args:
         vm_ip: Postgres VM IP (internal)
         pg_config: PostgreSQL configuration parameters
@@ -226,13 +226,13 @@ def reconfigure_patroni(
   parameters:
     shared_buffers: "{shared_buffers}MB"
     effective_cache_size: "{effective_cache_size}MB"
-    work_mem: "{pg_config['work_mem_mb']}MB"
-    maintenance_work_mem: "{pg_config['maintenance_work_mem_mb']}MB"
+    work_mem: "{pg_config["work_mem_mb"]}MB"
+    maintenance_work_mem: "{pg_config["maintenance_work_mem_mb"]}MB"
     max_connections: {pg_config["max_connections"]}
     random_page_cost: {pg_config["random_page_cost"]}
     effective_io_concurrency: {pg_config["effective_io_concurrency"]}
-    wal_buffers: "{pg_config['wal_buffers_mb']}MB"
-    max_wal_size: "{pg_config['max_wal_size_gb']}GB"
+    wal_buffers: "{pg_config["wal_buffers_mb"]}MB"
+    max_wal_size: "{pg_config["max_wal_size_gb"]}GB"
     checkpoint_completion_target: {pg_config["checkpoint_completion_target"]}
     max_worker_processes: {pg_config["max_worker_processes"]}
     max_parallel_workers_per_gather: {pg_config["max_parallel_workers_per_gather"]}
@@ -410,7 +410,9 @@ def initialize_pgbench(
     print(f"  Initializing pgbench (scale={scale}) on Postgres VM...")
 
     init_cmd = f"sudo -u postgres pgbench -i -s {scale} postgres"
-    code, output = run_ssh_command(postgres_ip, init_cmd, timeout=300, jump_host=jump_host)
+    code, output = run_ssh_command(
+        postgres_ip, init_cmd, timeout=300, jump_host=jump_host
+    )
     if code != 0:
         print(f"  Warning: pgbench init may have failed: {output[:500]}")
         return False

@@ -19,8 +19,6 @@ Usage:
 
 import argparse
 import json
-import re
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -87,6 +85,7 @@ def get_config_search_space():
 @dataclass
 class BenchmarkResult:
     """Benchmark results."""
+
     qps: float = 0.0
     p50_ms: float = 0.0
     p95_ms: float = 0.0
@@ -101,7 +100,7 @@ def wait_for_meilisearch_ready(
 ) -> bool:
     """Wait for Meilisearch to be healthy."""
     print("  Waiting for Meilisearch to be ready...")
-    
+
     start = time.time()
     while time.time() - start < timeout:
         try:
@@ -117,7 +116,7 @@ def wait_for_meilisearch_ready(
         except Exception:
             pass
         time.sleep(5)
-    
+
     print(f"  Warning: Meilisearch not ready after {timeout}s")
     return False
 
@@ -127,7 +126,7 @@ def upload_and_index_dataset(
 ) -> float:
     """Generate, upload and index the dataset. Returns indexing time in seconds."""
     print(f"  Generating and indexing {DATASET_SIZE:,} products...")
-    
+
     # Generate dataset on benchmark VM using Node.js
     gen_cmd = f"""
 cd /tmp && node << 'JSEOF'
@@ -180,7 +179,7 @@ JSEOF
     if code != 0:
         print(f"  Failed to generate dataset: {output}")
         return -1
-    
+
     # Create index with settings
     create_cmd = f"""
 curl -sf -X POST 'http://{meili_ip}:7700/indexes' \\
@@ -189,7 +188,7 @@ curl -sf -X POST 'http://{meili_ip}:7700/indexes' \\
   --data '{{"uid": "products", "primaryKey": "id"}}'
 """
     run_ssh_command(benchmark_ip, create_cmd, timeout=30)
-    
+
     # Configure index settings
     settings_cmd = f"""
 curl -sf -X PATCH 'http://{meili_ip}:7700/indexes/products/settings' \\
@@ -203,10 +202,10 @@ curl -sf -X PATCH 'http://{meili_ip}:7700/indexes/products/settings' \\
 """
     run_ssh_command(benchmark_ip, settings_cmd, timeout=30)
     time.sleep(2)
-    
+
     # Upload documents in batches
     start_time = time.time()
-    
+
     upload_cmd = f"""
 split -l 50000 /tmp/products.ndjson /tmp/batch_
 for f in /tmp/batch_*; do
@@ -222,7 +221,7 @@ done
     if code != 0:
         print(f"  Failed to upload dataset: {output}")
         return -1
-    
+
     # Wait for indexing to complete
     print("  Waiting for indexing to complete...")
     wait_cmd = f"""
@@ -238,10 +237,10 @@ while true; do
 done
 """
     code, output = run_ssh_command(benchmark_ip, wait_cmd, timeout=600)
-    
+
     indexing_time = time.time() - start_time
     print(f"  Indexing completed in {indexing_time:.1f}s")
-    
+
     # Verify document count
     stats_cmd = f"""
 curl -sf 'http://{meili_ip}:7700/indexes/products/stats' \\
@@ -252,9 +251,9 @@ curl -sf 'http://{meili_ip}:7700/indexes/products/stats' \\
         try:
             stats = json.loads(output.strip().split("\n")[-1])
             print(f"  Indexed {stats.get('numberOfDocuments', 0):,} documents")
-        except:
+        except Exception:
             pass
-    
+
     return indexing_time
 
 
@@ -263,14 +262,14 @@ def run_k6_benchmark(
 ) -> BenchmarkResult:
     """Run k6 benchmark from benchmark VM."""
     print(f"  Running k6 benchmark (vus={vus}, duration={duration}s)...")
-    
+
     # Upload k6 script
     with open(BENCHMARK_SCRIPT) as f:
         script_content = f.read()
-    
+
     upload_cmd = f"cat > /tmp/benchmark.js << 'EOFSCRIPT'\n{script_content}\nEOFSCRIPT"
     run_ssh_command(benchmark_ip, upload_cmd, timeout=30)
-    
+
     # Run k6
     k6_cmd = f"""
 k6 run /tmp/benchmark.js \\
@@ -282,17 +281,17 @@ k6 run /tmp/benchmark.js \\
   2>&1
 """
     code, output = run_ssh_command(benchmark_ip, k6_cmd, timeout=duration + 60)
-    
+
     if code != 0:
         return BenchmarkResult(error=f"k6 failed: {output[:500]}")
-    
+
     # Parse results
     cat_cmd = "cat /tmp/k6_results.json"
     code, results_json = run_ssh_command(benchmark_ip, cat_cmd, timeout=10)
-    
+
     if code != 0:
         return BenchmarkResult(error="Failed to get k6 results")
-    
+
     try:
         # Find the JSON in output
         for line in results_json.strip().split("\n"):
@@ -301,23 +300,23 @@ k6 run /tmp/benchmark.js \\
                 break
         else:
             results = json.loads(results_json.strip())
-        
+
         metrics = results.get("metrics", {})
-        
+
         # Extract metrics
         http_reqs = metrics.get("http_reqs", {})
         search_latency = metrics.get("search_latency_ms", {})
         search_errors = metrics.get("search_errors", {})
-        
+
         qps = http_reqs.get("rate", 0)
         p50 = search_latency.get("med", 0) if search_latency else 0
         p95 = search_latency.get("p(95)", 0) if search_latency else 0
         p99 = search_latency.get("p(99)", 0) if search_latency else 0
-        
+
         total_reqs = http_reqs.get("count", 1)
         errors = search_errors.get("count", 0) if search_errors else 0
         error_rate = errors / total_reqs if total_reqs > 0 else 0
-        
+
         return BenchmarkResult(
             qps=qps,
             p50_ms=p50,
@@ -325,7 +324,7 @@ k6 run /tmp/benchmark.js \\
             p99_ms=p99,
             error_rate=error_rate,
         )
-        
+
     except Exception as e:
         return BenchmarkResult(error=f"Failed to parse results: {e}")
 
@@ -335,12 +334,12 @@ def ensure_infra(
 ) -> tuple[str, str]:
     """Ensure Meilisearch and Benchmark VMs exist. Returns (benchmark_ip, meili_ip)."""
     print(f"\nChecking infrastructure for {cloud_config.name}...")
-    
+
     tf = get_terraform(cloud_config.terraform_dir)
-    
+
     meili_ip = get_tf_output(tf, "meilisearch_vm_ip")
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
-    
+
     if meili_ip and benchmark_ip:
         print(f"  Found Meilisearch VM: {meili_ip}")
         print(f"  Found Benchmark VM: {benchmark_ip}")
@@ -353,9 +352,9 @@ def ensure_infra(
             )
             if code == 0:
                 return benchmark_ip, meili_ip
-        except:
+        except Exception:
             pass
-    
+
     print("  Creating infrastructure...")
     tf_vars = {
         "meilisearch_enabled": True,
@@ -363,35 +362,37 @@ def ensure_infra(
         "redis_enabled": False,
         "minio_enabled": False,
     }
-    
+
     if infra_config:
-        tf_vars.update({
-            "meilisearch_cpu": infra_config.get("cpu", 4),
-            "meilisearch_ram_gb": infra_config.get("ram_gb", 8),
-            "meilisearch_disk_type": infra_config.get("disk_type", "fast"),
-        })
-    
+        tf_vars.update(
+            {
+                "meilisearch_cpu": infra_config.get("cpu", 4),
+                "meilisearch_ram_gb": infra_config.get("ram_gb", 8),
+                "meilisearch_disk_type": infra_config.get("disk_type", "fast"),
+            }
+        )
+
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
-    
+
     if ret_code != 0:
         raise RuntimeError(f"Failed to create infrastructure: {stderr}")
-    
+
     meili_ip = get_tf_output(tf, "meilisearch_vm_ip")
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
-    
+
     if not meili_ip:
         raise RuntimeError("Meilisearch VM created but no IP returned")
     if not benchmark_ip:
         raise RuntimeError("Benchmark VM created but no IP returned")
-    
+
     print(f"  Meilisearch VM: {meili_ip}")
     print(f"  Benchmark VM: {benchmark_ip}")
-    
+
     # Wait for VMs
     wait_for_vm_ready(benchmark_ip)
     wait_for_vm_ready(meili_ip, jump_host=benchmark_ip)
     wait_for_meilisearch_ready(meili_ip, jump_host=benchmark_ip)
-    
+
     return benchmark_ip, meili_ip
 
 
@@ -400,10 +401,10 @@ def reconfigure_meilisearch(
 ) -> bool:
     """Reconfigure Meilisearch with new settings."""
     print(f"  Reconfiguring Meilisearch: {config}")
-    
+
     max_mem = config.get("max_indexing_memory_mb", 1024)
     max_threads = config.get("max_indexing_threads", 0)
-    
+
     # Update environment file
     env_content = f"""MEILI_ENV=production
 MEILI_HTTP_ADDR=0.0.0.0:7700
@@ -411,24 +412,76 @@ MEILI_MASTER_KEY={MASTER_KEY}
 MEILI_NO_ANALYTICS=true
 MEILI_LOG_LEVEL=INFO
 MEILI_MAX_INDEXING_MEMORY={max_mem}Mb
-MEILI_MAX_INDEXING_THREADS={max_threads if max_threads > 0 else 'auto'}
+MEILI_MAX_INDEXING_THREADS={max_threads if max_threads > 0 else "auto"}
 """
-    
+
     update_cmd = f"cat > /etc/meilisearch.env << 'EOF'\n{env_content}EOF"
-    code, output = run_ssh_command(meili_ip, update_cmd, timeout=30, jump_host=jump_host)
+    code, output = run_ssh_command(
+        meili_ip, update_cmd, timeout=30, jump_host=jump_host
+    )
     if code != 0:
         print(f"  Failed to update config: {output}")
         return False
-    
+
     # Restart Meilisearch
     restart_cmd = "systemctl restart meilisearch && sleep 3"
-    code, output = run_ssh_command(meili_ip, restart_cmd, timeout=60, jump_host=jump_host)
+    code, output = run_ssh_command(
+        meili_ip, restart_cmd, timeout=60, jump_host=jump_host
+    )
     if code != 0:
         print(f"  Failed to restart Meilisearch: {output}")
         return False
-    
+
     # Wait for it to be ready
     return wait_for_meilisearch_ready(meili_ip, timeout=60, jump_host=jump_host)
+
+
+def results_file(cloud: str, mode: str) -> Path:
+    """Get results file path for a cloud and mode."""
+    return RESULTS_DIR / f"results_{cloud}_{mode}.json"
+
+
+def config_to_key(infra: dict, meili_config: dict) -> str:
+    """Convert config dicts to a hashable key for deduplication."""
+    return json.dumps({"infra": infra, "meili": meili_config}, sort_keys=True)
+
+
+def find_cached_result(
+    infra: dict, meili_config: dict, cloud: str, mode: str
+) -> dict | None:
+    """Find a cached successful result for the given config.
+
+    Searches across all modes (infra, config, full) to maximize cache hits.
+    """
+    target_key = config_to_key(infra, meili_config)
+
+    # Search all modes for cached results
+    all_modes = ["infra", "config", "full"]
+    for search_mode in all_modes:
+        rf = results_file(cloud, search_mode)
+        if not rf.exists():
+            continue
+        for result in load_results(rf):
+            result_key = config_to_key(
+                result.get("infra", {}), result.get("config", {})
+            )
+            if result_key == target_key:
+                if result.get("error"):
+                    continue  # Skip errored, try next
+                if result.get("qps", 0) <= 0:
+                    continue  # Skip failed, try next
+                return result
+    return None
+
+
+def get_metric_value(result: dict, metric: str) -> float:
+    """Extract the optimization metric value from a result."""
+    if metric == "qps":
+        return result.get("qps", 0)
+    elif metric == "indexing_time":
+        return result.get("indexing_time_s", float("inf"))
+    else:  # p95_ms default
+        return result.get("p95_ms", float("inf"))
 
 
 def save_result(
@@ -442,24 +495,26 @@ def save_result(
     indexing_time: float = 0,
 ):
     """Save benchmark result."""
-    results_file = RESULTS_DIR / f"results_{cloud}_{mode}.json"
-    results = load_results(results_file)
-    
-    results.append({
-        "trial": trial_num,
-        "timestamp": datetime.now().isoformat(),
-        "infra": infra_config,
-        "config": meili_config,
-        "qps": result.qps,
-        "p50_ms": result.p50_ms,
-        "p95_ms": result.p95_ms,
-        "p99_ms": result.p99_ms,
-        "error_rate": result.error_rate,
-        "indexing_time_s": indexing_time,
-        "error": result.error,
-    })
-    
-    save_results(results, results_file)
+    rf = results_file(cloud, mode)
+    results = load_results(rf)
+
+    results.append(
+        {
+            "trial": trial_num,
+            "timestamp": datetime.now().isoformat(),
+            "infra": infra_config,
+            "config": meili_config,
+            "qps": result.qps,
+            "p50_ms": result.p50_ms,
+            "p95_ms": result.p95_ms,
+            "p99_ms": result.p99_ms,
+            "error_rate": result.error_rate,
+            "indexing_time_s": indexing_time,
+            "error": result.error,
+        }
+    )
+
+    save_results(results, rf)
 
 
 def objective_infra(
@@ -470,47 +525,61 @@ def objective_infra(
 ) -> float:
     """Objective function for infrastructure optimization."""
     space = get_infra_search_space()
-    
+
     infra_config = {
         "cpu": trial.suggest_categorical("cpu", space["cpu"]),
         "ram_gb": trial.suggest_categorical("ram_gb", space["ram_gb"]),
         "disk_type": trial.suggest_categorical("disk_type", space["disk_type"]),
     }
-    
+
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [infra]: {infra_config}")
     print(f"{'=' * 60}")
-    
+
+    # Check cache
+    cached = find_cached_result(infra_config, {}, cloud, "infra")
+    if cached:
+        cached_value = get_metric_value(cached, metric)
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
+
     # Destroy and recreate
     print("  Destroying previous VM...")
     destroy_all(cloud_config.terraform_dir, cloud_config.name)
     time.sleep(5)
-    
+
     try:
         benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
     except Exception as e:
         print(f"  Failed to create infrastructure: {e}")
         raise optuna.TrialPruned("Infrastructure creation failed")
-    
+
     # Index dataset
     indexing_time = upload_and_index_dataset(benchmark_ip, meili_ip)
     if indexing_time < 0:
         raise optuna.TrialPruned("Indexing failed")
-    
+
     # Run benchmark
     vus = infra_config["cpu"] * 2
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
-    
+
     if result.error:
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
-    
+
     print(f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms")
-    
+
     save_result(
-        result, infra_config, {}, trial.number, cloud, "infra", cloud_config, indexing_time
+        result,
+        infra_config,
+        {},
+        trial.number,
+        cloud,
+        "infra",
+        cloud_config,
+        indexing_time,
     )
-    
+
     # Return metric (minimize p95, maximize qps)
     if metric == "p95_ms":
         return result.p95_ms
@@ -531,7 +600,7 @@ def objective_config(
 ) -> float:
     """Objective function for config optimization."""
     space = get_config_search_space()
-    
+
     config = {
         "max_indexing_memory_mb": trial.suggest_categorical(
             "max_indexing_memory_mb", space["max_indexing_memory_mb"]
@@ -540,15 +609,22 @@ def objective_config(
             "max_indexing_threads", space["max_indexing_threads"]
         ),
     }
-    
+
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [config]: {config}")
     print(f"{'=' * 60}")
-    
+
+    # Check cache
+    cached = find_cached_result(infra_config, config, cloud, "config")
+    if cached:
+        cached_value = get_metric_value(cached, metric)
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
+
     # Reconfigure and re-index
     if not reconfigure_meilisearch(meili_ip, config, jump_host=benchmark_ip):
         raise optuna.TrialPruned("Meilisearch config failed")
-    
+
     # Re-index to test indexing performance with new settings
     # First delete existing index
     delete_cmd = f"""
@@ -557,25 +633,34 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
 """
     run_ssh_command(benchmark_ip, delete_cmd, timeout=30)
     time.sleep(2)
-    
+
     indexing_time = upload_and_index_dataset(benchmark_ip, meili_ip)
     if indexing_time < 0:
         raise optuna.TrialPruned("Indexing failed")
-    
+
     # Run benchmark
     vus = infra_config.get("cpu", 4) * 2
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
-    
+
     if result.error:
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
-    
-    print(f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, indexing={indexing_time:.1f}s")
-    
-    save_result(
-        result, infra_config, config, trial.number, cloud, "config", cloud_config, indexing_time
+
+    print(
+        f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, indexing={indexing_time:.1f}s"
     )
-    
+
+    save_result(
+        result,
+        infra_config,
+        config,
+        trial.number,
+        cloud,
+        "config",
+        cloud_config,
+        indexing_time,
+    )
+
     if metric == "p95_ms":
         return result.p95_ms
     elif metric == "qps":
@@ -589,10 +674,18 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
 def main():
     parser = argparse.ArgumentParser(description="Meilisearch Configuration Optimizer")
     parser.add_argument(
-        "--cloud", "-c", required=True, choices=["selectel", "timeweb"], help="Cloud provider"
+        "--cloud",
+        "-c",
+        required=True,
+        choices=["selectel", "timeweb"],
+        help="Cloud provider",
     )
     parser.add_argument(
-        "--mode", "-m", required=True, choices=["infra", "config", "full"], help="Optimization mode"
+        "--mode",
+        "-m",
+        required=True,
+        choices=["infra", "config", "full"],
+        help="Optimization mode",
     )
     parser.add_argument("--trials", "-t", type=int, default=10, help="Number of trials")
     parser.add_argument(
@@ -602,30 +695,40 @@ def main():
         help="Metric to optimize",
     )
     parser.add_argument("--cpu", type=int, default=4, help="Fixed CPU for config mode")
-    parser.add_argument("--ram", type=int, default=8, help="Fixed RAM GB for config mode")
-    parser.add_argument("--no-destroy", action="store_true", help="Keep infrastructure after optimization")
-    parser.add_argument("--show-results", action="store_true", help="Show results and exit")
-    
+    parser.add_argument(
+        "--ram", type=int, default=8, help="Fixed RAM GB for config mode"
+    )
+    parser.add_argument(
+        "--no-destroy",
+        action="store_true",
+        help="Keep infrastructure after optimization",
+    )
+    parser.add_argument(
+        "--show-results", action="store_true", help="Show results and exit"
+    )
+
     args = parser.parse_args()
     cloud_config = get_cloud_config(args.cloud)
-    
+
     # Determine direction
     direction = "minimize" if args.metric == "p95_ms" else "maximize"
     if args.metric == "indexing_time":
         direction = "minimize"
-    
+
     print(f"\nMeilisearch Optimizer - {cloud_config.name} [{args.mode}]")
     print(f"Metric: {args.metric} ({direction})")
     print(f"Trials: {args.trials}")
-    
+
     if args.show_results:
         results_file = RESULTS_DIR / f"results_{args.cloud}_{args.mode}.json"
         if results_file.exists():
             results = load_results(results_file)
             for r in results[-10:]:
-                print(f"Trial {r['trial']}: {r.get('qps', 0):.1f} QPS, p95={r.get('p95_ms', 0):.1f}ms")
+                print(
+                    f"Trial {r['trial']}: {r.get('qps', 0):.1f} QPS, p95={r.get('p95_ms', 0):.1f}ms"
+                )
         return
-    
+
     try:
         if args.mode == "infra":
             study = optuna.create_study(
@@ -635,25 +738,27 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
-            
+
             study.optimize(
-                lambda trial: objective_infra(trial, args.cloud, cloud_config, args.metric),
+                lambda trial: objective_infra(
+                    trial, args.cloud, cloud_config, args.metric
+                ),
                 n_trials=args.trials,
                 catch=(optuna.TrialPruned,),
             )
-            
+
         elif args.mode == "config":
             infra_config = {
                 "cpu": args.cpu,
                 "ram_gb": args.ram,
                 "disk_type": "fast",
             }
-            
+
             benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
-            
+
             # Initial indexing
             upload_and_index_dataset(benchmark_ip, meili_ip)
-            
+
             study = optuna.create_study(
                 study_name=f"meilisearch-{args.cloud}-config",
                 storage=f"sqlite:///{STUDY_DB}",
@@ -661,20 +766,28 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
-            
+
             study.optimize(
                 lambda trial: objective_config(
-                    trial, args.cloud, cloud_config, benchmark_ip, meili_ip, infra_config, args.metric
+                    trial,
+                    args.cloud,
+                    cloud_config,
+                    benchmark_ip,
+                    meili_ip,
+                    infra_config,
+                    args.metric,
                 ),
                 n_trials=args.trials,
                 catch=(optuna.TrialPruned,),
             )
-            
+
         elif args.mode == "full":
             # Phase 1: Infra
             infra_trials = args.trials // 2
-            print(f"\n=== Phase 1: Infrastructure optimization ({infra_trials} trials) ===")
-            
+            print(
+                f"\n=== Phase 1: Infrastructure optimization ({infra_trials} trials) ==="
+            )
+
             study_infra = optuna.create_study(
                 study_name=f"meilisearch-{args.cloud}-full-infra",
                 storage=f"sqlite:///{STUDY_DB}",
@@ -682,13 +795,15 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
-            
+
             study_infra.optimize(
-                lambda trial: objective_infra(trial, args.cloud, cloud_config, args.metric),
+                lambda trial: objective_infra(
+                    trial, args.cloud, cloud_config, args.metric
+                ),
                 n_trials=infra_trials,
                 catch=(optuna.TrialPruned,),
             )
-            
+
             # Phase 2: Config on best infra
             best_infra = study_infra.best_params
             infra_config = {
@@ -696,15 +811,17 @@ def main():
                 "ram_gb": best_infra["ram_gb"],
                 "disk_type": best_infra["disk_type"],
             }
-            
+
             config_trials = args.trials - infra_trials
-            print(f"\n=== Phase 2: Config optimization on best host ({config_trials} trials) ===")
+            print(
+                f"\n=== Phase 2: Config optimization on best host ({config_trials} trials) ==="
+            )
             print(f"Best infra: {infra_config}")
-            
+
             destroy_all(cloud_config.terraform_dir, cloud_config.name)
             benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
             upload_and_index_dataset(benchmark_ip, meili_ip)
-            
+
             study_config = optuna.create_study(
                 study_name=f"meilisearch-{args.cloud}-full-config",
                 storage=f"sqlite:///{STUDY_DB}",
@@ -712,20 +829,26 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
-            
+
             study_config.optimize(
                 lambda trial: objective_config(
-                    trial, args.cloud, cloud_config, benchmark_ip, meili_ip, infra_config, args.metric
+                    trial,
+                    args.cloud,
+                    cloud_config,
+                    benchmark_ip,
+                    meili_ip,
+                    infra_config,
+                    args.metric,
                 ),
                 n_trials=config_trials,
                 catch=(optuna.TrialPruned,),
             )
-            
-            print(f"\n=== Best Configuration ===")
+
+            print("\n=== Best Configuration ===")
             print(f"Infra: {infra_config}")
             print(f"Config: {study_config.best_params}")
             print(f"Best {args.metric}: {study_config.best_value}")
-    
+
     finally:
         if not args.no_destroy:
             print("\nCleaning up...")

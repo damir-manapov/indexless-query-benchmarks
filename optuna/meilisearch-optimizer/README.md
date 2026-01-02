@@ -13,11 +13,11 @@ Bayesian optimization for finding the best Meilisearch configuration using Optun
 
 ## Optimization Modes
 
-| Mode   | Description                                                    |
-| ------ | -------------------------------------------------------------- |
-| infra  | Tune VM specs (CPU, RAM, disk) - creates new VM per trial      |
-| config | Tune Meilisearch config on fixed host - reconfigures existing  |
-| full   | Two-phase: infra optimization first, then config on best host  |
+| Mode   | Description                                                   |
+| ------ | ------------------------------------------------------------- |
+| infra  | Tune VM specs (CPU, RAM, disk) - creates new VM per trial     |
+| config | Tune Meilisearch config on fixed host - reconfigures existing |
+| full   | Two-phase: infra optimization first, then config on best host |
 
 ## Setup
 
@@ -52,26 +52,26 @@ uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode infra -
 
 ### Infrastructure (--mode infra)
 
-| Parameter | Values             | Notes               |
-| --------- | ------------------ | ------------------- |
-| cpu       | 2, 4, 8, 16        | vCPU count          |
-| ram_gb    | 4, 8, 16, 32       | GB per VM           |
-| disk_type | fast, universal    | NVMe vs SSD         |
+| Parameter | Values          | Notes       |
+| --------- | --------------- | ----------- |
+| cpu       | 2, 4, 8, 16     | vCPU count  |
+| ram_gb    | 4, 8, 16, 32    | GB per VM   |
+| disk_type | fast, universal | NVMe vs SSD |
 
 ### Meilisearch Config (--mode config)
 
-| Parameter                | Values                | Notes                     |
-| ------------------------ | --------------------- | ------------------------- |
-| max_indexing_memory_mb   | 256, 512, 1024, 2048  | RAM for indexing          |
-| max_indexing_threads     | 0, 2, 4, 8            | 0 = auto                  |
+| Parameter              | Values               | Notes            |
+| ---------------------- | -------------------- | ---------------- |
+| max_indexing_memory_mb | 256, 512, 1024, 2048 | RAM for indexing |
+| max_indexing_threads   | 0, 2, 4, 8           | 0 = auto         |
 
 ## Metrics
 
-| Metric         | Direction | Description                  |
-| -------------- | --------- | ---------------------------- |
-| p95_ms         | Minimize  | 95th percentile latency      |
-| qps            | Maximize  | Queries per second           |
-| indexing_time  | Minimize  | Time to index 500K docs      |
+| Metric        | Direction | Description             |
+| ------------- | --------- | ----------------------- |
+| p95_ms        | Minimize  | 95th percentile latency |
+| qps           | Maximize  | Queries per second      |
+| indexing_time | Minimize  | Time to index 500K docs |
 
 ## Query Patterns
 
