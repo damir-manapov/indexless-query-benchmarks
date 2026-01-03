@@ -52,23 +52,29 @@ def run_ssh_command(
 
 
 def wait_for_vm_ready(
-    vm_ip: str, timeout: int = 600, jump_host: str | None = None
+    vm_ip: str,
+    timeout: int = 600,
+    jump_host: str | None = None,
 ) -> bool:
-    """Wait for benchmark VM to be ready (cloud-init complete)."""
+    """Wait for VM to be ready (cloud-init complete)."""
     print(f"  Waiting for VM {vm_ip} to be ready...")
 
     start = time.time()
     while time.time() - start < timeout:
         try:
-            code, _ = run_ssh_command(
-                vm_ip, "test -f /root/benchmark-ready", timeout=15, jump_host=jump_host
+            code, output = run_ssh_command(
+                vm_ip, "test -f /root/cloud-init-ready", timeout=15, jump_host=jump_host
             )
             if code == 0:
                 print("  VM is ready!")
                 return True
+
+            elapsed = int(time.time() - start)
+            # Check if SSH itself failed (connection refused, etc.)
+            if "Connection refused" in output or "No route to host" in output:
+                print(f"  SSH not ready yet ({elapsed}s elapsed)")
             else:
-                elapsed = int(time.time() - start)
-                # Show tail of cloud-init log to help debug
+                # SSH works but marker not ready - show cloud-init log
                 _, log_tail = run_ssh_command(
                     vm_ip,
                     "tail -3 /var/log/cloud-init-output.log 2>/dev/null || echo 'no log yet'",
@@ -78,7 +84,8 @@ def wait_for_vm_ready(
                 log_preview = log_tail.strip().replace("\n", " | ") if log_tail else "no output"
                 print(f"  Marker file not ready yet ({elapsed}s elapsed): {log_preview}")
         except Exception as e:
-            print(f"  SSH not ready yet: {e}")
+            elapsed = int(time.time() - start)
+            print(f"  SSH not ready yet ({elapsed}s elapsed): {e}")
         time.sleep(10)
 
     print(f"  Warning: VM not ready after {timeout}s, continuing anyway...")

@@ -70,6 +70,6 @@ runcmd:
   - redis-cli ping
 
   # Create ready marker
-  - touch /root/redis-ready
+  - touch /root/cloud-init-ready
 
 final_message: "Redis single node ready after $UPTIME seconds"

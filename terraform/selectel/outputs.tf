@@ -26,5 +26,5 @@ output "project_id" {
 
 output "wait_for_ready" {
   description = "Command to wait for cloud-init to complete"
-  value       = "ssh root@${openstack_networking_floatingip_v2.benchmark.address} 'while [ ! -f /root/benchmark-ready ]; do echo \"Waiting for setup...\"; sleep 10; done; echo \"Ready!\"'"
+  value       = "ssh root@${openstack_networking_floatingip_v2.benchmark.address} 'while [ ! -f /root/cloud-init-ready ]; do echo \"Waiting for setup...\"; sleep 10; done; echo \"Ready!\"'"
 }

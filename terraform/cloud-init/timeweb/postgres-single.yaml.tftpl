@@ -33,6 +33,6 @@ runcmd:
   - systemctl enable postgresql
 
   # Create ready marker
-  - touch /root/postgres-ready
+  - touch /root/cloud-init-ready
 
 final_message: "PostgreSQL Single Node ready after $UPTIME seconds"

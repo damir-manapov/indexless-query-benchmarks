@@ -103,6 +103,6 @@ runcmd:
   - sleep 5
 
   # Create ready marker
-  - touch /root/redis-ready
+  - touch /root/cloud-init-ready
 
 final_message: "Redis Sentinel node ${node_index + 1} ready after $UPTIME seconds"

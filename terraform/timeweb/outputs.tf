@@ -26,7 +26,7 @@ output "vm_specs" {
 
 output "wait_for_ready" {
   description = "Command to wait for VM setup completion"
-  value       = "ssh root@${twc_server_ip.benchmark_ipv4.ip} 'while [ ! -f /root/benchmark-ready ]; do echo \"Waiting for setup...\"; sleep 10; done; echo \"Ready!\"'"
+  value       = "ssh root@${twc_server_ip.benchmark_ipv4.ip} 'while [ ! -f /root/cloud-init-ready ]; do echo \"Waiting for setup...\"; sleep 10; done; echo \"Ready!\"'"
 }
 
 output "root_password" {
