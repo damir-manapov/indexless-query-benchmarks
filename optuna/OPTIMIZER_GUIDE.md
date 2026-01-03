@@ -216,13 +216,14 @@ def find_cached_result(infra: dict, config: dict, cloud: str) -> dict | None:
 def save_result(cloud: str, infra: dict, config: dict,
                 result: BenchmarkResult, trial_num: int,
                 cloud_config: CloudConfig) -> None:
-    """Save benchmark result to cache."""
+    """Save benchmark result to cache.
+
+    Note: cost_per_month and cost_efficiency are NOT stored - they are
+    calculated on-the-fly in format_results() using current pricing.
+    This ensures pricing updates reflect immediately in reports.
+    """
     path = results_file()
     results = load_results(path)
-
-    # Calculate cost and efficiency
-    cost = calculate_cost(infra, cloud_config)
-    cost_efficiency = result.throughput / cost if cost > 0 else 0
 
     # Convert timings to dict for JSON serialization
     timings_dict = None
@@ -240,8 +241,7 @@ def save_result(cloud: str, infra: dict, config: dict,
         "cloud": cloud,  # Store cloud for key matching
         "infra": infra,
         "config": config,
-        "cost_per_month": cost,           # ₽/mo for this config
-        "cost_efficiency": cost_efficiency,  # throughput per ₽/mo
+        # Cost is calculated on-the-fly in format_results()
         "metrics": {
             "throughput": result.throughput,
             "latency_p95_ms": result.latency_p95_ms,
