@@ -49,34 +49,45 @@ from pricing import get_cloud_pricing, CloudPricing
 pricing = get_cloud_pricing("selectel")
 ```
 
-| Cloud    | CPU (₽/vCPU/mo) | RAM (₽/GB/mo) | Disk (₽/GB/mo)                    |
-|----------|-----------------|---------------|-----------------------------------|
-| Selectel | 655             | 238           | fast: 11, universal: 9, basic: 7  |
-| Timeweb  | 220             | 180           | nvme: 5, ssd: 4, hdd: 2           |
+| Cloud    | CPU (₽/vCPU/mo) | RAM (₽/GB/mo) | Disk (₽/GB/mo)                   |
+| -------- | --------------- | ------------- | -------------------------------- |
+| Selectel | 655             | 238           | fast: 11, universal: 9, basic: 7 |
+| Timeweb  | 220             | 180           | nvme: 5, ssd: 4, hdd: 2          |
 
 ### Cloud Constraints
 
 Cloud providers have minimum RAM requirements per CPU. These constraints are defined in `pricing.py`:
 
 | vCPU | Min RAM (Selectel) |
-|------|---------------------|
-| 2    | 2 GB                |
-| 4    | 4 GB                |
-| 8    | 8 GB                |
-| 16   | 32 GB               |
+| ---- | ------------------ |
+| 2    | 2 GB               |
+| 4    | 4 GB               |
+| 8    | 8 GB               |
+| 16   | 32 GB              |
 
-Use `validate_infra_config()` from `pricing.py` to prune invalid configs early:
+Use `filter_valid_ram()` from `pricing.py` to constrain Optuna's search space **before** suggesting:
 
 ```python
-from pricing import validate_infra_config
+from pricing import filter_valid_ram
 
 # In objective_infra():
-constraint_error = validate_infra_config(cloud, infra_config["cpu"], infra_config["ram_gb"])
-if constraint_error:
-    raise optuna.TrialPruned(constraint_error)
+cpu = trial.suggest_categorical("cpu", space["cpu"])
+valid_ram = filter_valid_ram(cloud, cpu, space["ram_gb"])
+
+infra_config = {
+    "cpu": cpu,
+    "ram_gb": trial.suggest_categorical("ram_gb", valid_ram),
+    ...
+}
 ```
 
-This is **required** for all optimizers with infrastructure optimization (`objective_infra`).
+This approach is better than pruning because:
+
+- No wasted trials on invalid configs
+- Optuna learns only from valid parameter space
+- Cleaner trial history
+
+This is **required** for all optimizers with infrastructure optimization.
 
 ### Trial Timings Dataclass
 
@@ -506,7 +517,7 @@ raise optuna.TrialPruned()  # Not raise RuntimeError
 - [ ] `ensure_infra()` with VM validation
 - [ ] `run_benchmark()` with timeout handling
 - [ ] `parse_*_output()` with error handling
-- [ ] `objective_infra()` with `validate_infra_config()` for cloud constraints
+- [ ] `objective_infra()` with `filter_valid_ram()` for cloud constraints
 - [ ] `objective_config()` (or single `objective()`)
 - [ ] CLI with `--cloud`, `--mode`, `--metric`, `--trials`, `--show-results`, `--destroy`
 - [ ] Trial pruning on failures and cached duplicates

@@ -80,7 +80,7 @@ Use `--metric p95_ms` or `--metric indexing_time` to optimize for different goal
 Each trial records phase timings in `results.json`:
 
 - `terraform_s` - Infrastructure provisioning time
-- `indexing_s` - Dataset indexing time  
+- `indexing_s` - Dataset indexing time
 - `benchmark_s` - k6 benchmark execution time
 - `trial_total_s` - Total trial duration
 

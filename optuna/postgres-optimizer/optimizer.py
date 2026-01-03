@@ -53,7 +53,7 @@ from cloud_config import (
     get_config_search_space,
     get_infra_search_space,
 )
-from pricing import validate_infra_config
+from pricing import filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -732,20 +732,19 @@ def objective_infra(
     """Objective function for infrastructure optimization."""
     space = get_infra_search_space(cloud)
 
+    # Select CPU first, then filter valid RAM options for that CPU
+    cpu = trial.suggest_categorical("cpu", space["cpu"])
+    valid_ram = filter_valid_ram(cloud, cpu, space["ram_gb"])
+
     infra_config = {
         "mode": trial.suggest_categorical("mode", space["mode"]),
-        "cpu": trial.suggest_categorical("cpu", space["cpu"]),
-        "ram_gb": trial.suggest_categorical("ram_gb", space["ram_gb"]),
+        "cpu": cpu,
+        "ram_gb": trial.suggest_categorical("ram_gb", valid_ram),
         "disk_type": trial.suggest_categorical("disk_type", space["disk_type"]),
         "disk_size_gb": trial.suggest_categorical(
             "disk_size_gb", space["disk_size_gb"]
         ),
     }
-
-    # Validate cloud constraints (e.g., 16 vCPU requires min 32GB RAM)
-    constraint_error = validate_infra_config(cloud, infra_config["cpu"], infra_config["ram_gb"])
-    if constraint_error:
-        raise optuna.TrialPruned(constraint_error)
 
     # Use reasonable default Postgres config
     ram_gb = infra_config["ram_gb"]
@@ -925,7 +924,9 @@ def objective_config(
     result.timings = timings
 
     print(f"  Result: {result.tps:.1f} TPS, {result.latency_avg_ms:.2f}ms latency")
-    print(f"  Timings: bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s")
+    print(
+        f"  Timings: bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+    )
 
     # Save result
     save_result(

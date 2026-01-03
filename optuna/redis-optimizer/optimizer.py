@@ -40,7 +40,7 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
-from pricing import validate_infra_config
+from pricing import filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -550,14 +550,16 @@ def objective(
     """Optuna objective function."""
     config_space = get_config_space(cloud)
 
+    # Select CPU first, then filter valid RAM options for that CPU
+    cpu_per_node = trial.suggest_categorical(
+        "cpu_per_node", config_space["cpu_per_node"]
+    )
+    valid_ram = filter_valid_ram(cloud, cpu_per_node, config_space["ram_per_node"])
+
     config = {
         "mode": trial.suggest_categorical("mode", config_space["mode"]),
-        "cpu_per_node": trial.suggest_categorical(
-            "cpu_per_node", config_space["cpu_per_node"]
-        ),
-        "ram_per_node": trial.suggest_categorical(
-            "ram_per_node", config_space["ram_per_node"]
-        ),
+        "cpu_per_node": cpu_per_node,
+        "ram_per_node": trial.suggest_categorical("ram_per_node", valid_ram),
         "maxmemory_policy": trial.suggest_categorical(
             "maxmemory_policy", config_space["maxmemory_policy"]
         ),
@@ -568,11 +570,6 @@ def objective(
             "persistence", config_space["persistence"]
         ),
     }
-
-    # Validate cloud constraints (e.g., 16 vCPU requires min 32GB RAM)
-    constraint_error = validate_infra_config(cloud, config["cpu_per_node"], config["ram_per_node"])
-    if constraint_error:
-        raise optuna.TrialPruned(constraint_error)
 
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [{cloud}]: {config}")

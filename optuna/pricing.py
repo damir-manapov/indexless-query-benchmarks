@@ -48,7 +48,9 @@ CLOUD_PRICING: dict[str, CloudPricing] = {
 def get_cloud_pricing(cloud: str) -> CloudPricing:
     """Get pricing rates for a cloud provider."""
     if cloud not in CLOUD_PRICING:
-        raise ValueError(f"Unknown cloud: {cloud}. Available: {list(CLOUD_PRICING.keys())}")
+        raise ValueError(
+            f"Unknown cloud: {cloud}. Available: {list(CLOUD_PRICING.keys())}"
+        )
     return CLOUD_PRICING[cloud]
 
 
@@ -61,9 +63,9 @@ def get_cloud_pricing(cloud: str) -> CloudPricing:
 CLOUD_MIN_RAM: dict[str, dict[int, int]] = {
     "selectel": {
         # Selectel Standard Line constraints
-        2: 2,   # 2 vCPU: min 4GB
-        4: 4,   # 4 vCPU: min 8GB
-        8: 8,   # 8 vCPU: min 8GB
+        2: 2,  # 2 vCPU: min 4GB
+        4: 4,  # 4 vCPU: min 8GB
+        8: 8,  # 8 vCPU: min 8GB
         16: 32,  # 16 vCPU: min 32GB
     },
     "timeweb": {},  # No known constraints
@@ -78,10 +80,22 @@ def get_min_ram_for_cpu(cloud: str, cpu: int) -> int:
 
 def validate_infra_config(cloud: str, cpu: int, ram_gb: int) -> str | None:
     """Validate infrastructure config against cloud constraints.
-    
+
     Returns error message if invalid, None if valid.
     """
     min_ram = get_min_ram_for_cpu(cloud, cpu)
     if ram_gb < min_ram:
         return f"{cpu} vCPU requires min {min_ram}GB RAM on {cloud}"
     return None
+
+
+def filter_valid_ram(cloud: str, cpu: int, ram_options: list[int]) -> list[int]:
+    """Filter RAM options to only those valid for the given CPU count.
+
+    Use this to constrain Optuna's search space before suggesting,
+    rather than pruning invalid configs after the fact.
+    """
+    min_ram = get_min_ram_for_cpu(cloud, cpu)
+    valid = [r for r in ram_options if r >= min_ram]
+    # Fallback to all options if no constraints or empty result
+    return valid if valid else ram_options

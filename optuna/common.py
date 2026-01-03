@@ -92,8 +92,12 @@ def wait_for_vm_ready(
                     timeout=10,
                     jump_host=jump_host,
                 )
-                log_preview = log_tail.strip().replace("\n", " | ") if log_tail else "no output"
-                print(f"  Marker file not ready yet ({elapsed}s elapsed): {log_preview}")
+                log_preview = (
+                    log_tail.strip().replace("\n", " | ") if log_tail else "no output"
+                )
+                print(
+                    f"  Marker file not ready yet ({elapsed}s elapsed): {log_preview}"
+                )
         except Exception as e:
             elapsed = int(time.time() - start)
             print(f"  SSH not ready yet ({elapsed}s elapsed): {e}")

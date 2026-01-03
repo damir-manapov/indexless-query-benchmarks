@@ -39,7 +39,7 @@ from common import (
     save_results,
     wait_for_vm_ready,
 )
-from pricing import get_cloud_pricing, validate_infra_config
+from pricing import filter_valid_ram, get_cloud_pricing
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -84,7 +84,9 @@ CLOUD_CONFIGS: dict[str, CloudConfig] = {
 
 def get_cloud_config(cloud: str) -> CloudConfig:
     if cloud not in CLOUD_CONFIGS:
-        raise ValueError(f"Unknown cloud: {cloud}. Available: {list(CLOUD_CONFIGS.keys())}")
+        raise ValueError(
+            f"Unknown cloud: {cloud}. Available: {list(CLOUD_CONFIGS.keys())}"
+        )
     return CLOUD_CONFIGS[cloud]
 
 
@@ -756,16 +758,15 @@ def objective_infra(
     """Objective function for infrastructure optimization."""
     space = get_infra_search_space()
 
+    # Select CPU first, then filter valid RAM options for that CPU
+    cpu = trial.suggest_categorical("cpu", space["cpu"])
+    valid_ram = filter_valid_ram(cloud, cpu, space["ram_gb"])
+
     infra_config = {
-        "cpu": trial.suggest_categorical("cpu", space["cpu"]),
-        "ram_gb": trial.suggest_categorical("ram_gb", space["ram_gb"]),
+        "cpu": cpu,
+        "ram_gb": trial.suggest_categorical("ram_gb", valid_ram),
         "disk_type": trial.suggest_categorical("disk_type", space["disk_type"]),
     }
-
-    # Validate cloud constraints (e.g., 16 vCPU requires min 32GB RAM)
-    constraint_error = validate_infra_config(cloud, infra_config["cpu"], infra_config["ram_gb"])
-    if constraint_error:
-        raise optuna.TrialPruned(constraint_error)
 
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [infra]: {infra_config}")
@@ -777,7 +778,9 @@ def objective_infra(
     cached = find_cached_result(infra_config, {}, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
-        print(f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate")
+        print(
+            f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate"
+        )
         trial.set_user_attr("cached", True)
         trial.set_user_attr("cached_value", cached_value)
         raise optuna.TrialPruned(f"Duplicate config, cached value: {cached_value:.2f}")
@@ -875,7 +878,9 @@ def objective_config(
     cached = find_cached_result(infra_config, config, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
-        print(f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate")
+        print(
+            f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate"
+        )
         trial.set_user_attr("cached", True)
         trial.set_user_attr("cached_value", cached_value)
         raise optuna.TrialPruned(f"Duplicate config, cached value: {cached_value:.2f}")

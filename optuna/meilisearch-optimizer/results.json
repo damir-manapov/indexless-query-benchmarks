@@ -281,5 +281,89 @@
       "benchmark_s": 64.40115094184875,
       "trial_total_s": 318.3129720687866
     }
+  },
+  {
+    "trial": 87,
+    "timestamp": "2026-01-03T10:28:16.556083",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 2,
+      "ram_gb": 16,
+      "disk_type": "universal"
+    },
+    "config": {},
+    "cost_per_hour": 5568,
+    "qps": 324.39112035705455,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 28.26518225669861,
+    "error": null,
+    "timings": {
+      "terraform_s": 150.40690732002258,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 37.23018980026245,
+      "benchmark_s": 64.52424168586731,
+      "trial_total_s": 281.21069169044495
+    }
+  },
+  {
+    "trial": 97,
+    "timestamp": "2026-01-03T10:33:28.404579",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 8,
+      "ram_gb": 32,
+      "disk_type": "fast"
+    },
+    "config": {},
+    "cost_per_hour": 13406,
+    "qps": 1287.211742784358,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 11.878416061401367,
+    "error": null,
+    "timings": {
+      "terraform_s": 166.90165972709656,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 21.13896632194519,
+      "benchmark_s": 64.43686580657959,
+      "trial_total_s": 311.5597367286682
+    }
+  },
+  {
+    "trial": 98,
+    "timestamp": "2026-01-03T10:39:12.713886",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 16,
+      "disk_type": "universal"
+    },
+    "config": {},
+    "cost_per_hour": 6878,
+    "qps": 643.5319583971568,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 18.056695461273193,
+    "error": null,
+    "timings": {
+      "terraform_s": 192.33927154541016,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 27.217183828353882,
+      "benchmark_s": 64.4357316493988,
+      "trial_total_s": 344.28152346611023
+    }
   }
 ]

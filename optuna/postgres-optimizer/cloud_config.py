@@ -22,7 +22,9 @@ class CloudConfig:
     disk_cost_multipliers: dict[str, float] = field(default_factory=dict)
 
 
-def _make_config(name: str, terraform_subdir: str, disk_types: list[str]) -> CloudConfig:
+def _make_config(
+    name: str, terraform_subdir: str, disk_types: list[str]
+) -> CloudConfig:
     """Create CloudConfig using common pricing."""
     pricing = get_cloud_pricing(name)
     return CloudConfig(
