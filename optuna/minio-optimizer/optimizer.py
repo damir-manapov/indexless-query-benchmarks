@@ -43,6 +43,7 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
+from pricing import filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -901,14 +902,16 @@ def objective(
     """Optuna objective function."""
     config_space = get_config_space(cloud)
 
+    # Select CPU first, then filter valid RAM options for that CPU
+    cpu_per_node = trial.suggest_categorical(
+        "cpu_per_node", config_space["cpu_per_node"]
+    )
+    valid_ram = filter_valid_ram(cloud, cpu_per_node, config_space["ram_per_node"])
+
     config = {
         "nodes": trial.suggest_categorical("nodes", config_space["nodes"]),
-        "cpu_per_node": trial.suggest_categorical(
-            "cpu_per_node", config_space["cpu_per_node"]
-        ),
-        "ram_per_node": trial.suggest_categorical(
-            "ram_per_node", config_space["ram_per_node"]
-        ),
+        "cpu_per_node": cpu_per_node,
+        "ram_per_node": trial.suggest_categorical("ram_per_node", valid_ram),
         "drives_per_node": trial.suggest_categorical(
             "drives_per_node", config_space["drives_per_node"]
         ),
