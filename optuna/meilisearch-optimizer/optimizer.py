@@ -114,10 +114,10 @@ def calculate_cost(infra_config: dict, cloud_config: CloudConfig) -> float:
 # Search spaces
 def get_infra_search_space():
     # Selectel Standard Line: valid CPU/RAM combinations
-    # 2 vCPU: 4-16GB, 4 vCPU: 8-32GB, 8 vCPU: 16-32GB, 16 vCPU: 32GB only
+    # 2 vCPU: 4-16GB, 4 vCPU: 8-32GB, 8 vCPU: 16-32GB, 16 vCPU: 32GB, 32 vCPU: 64GB
     return {
-        "cpu": [2, 4, 8, 16],
-        "ram_gb": [4, 8, 16, 32],
+        "cpu": [2, 4, 8, 16, 32],
+        "ram_gb": [4, 8, 16, 32, 64],
         "disk_type": ["fast", "universal"],  # NVMe vs SSD
     }
 

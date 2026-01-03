@@ -63,10 +63,11 @@ def get_cloud_pricing(cloud: str) -> CloudPricing:
 CLOUD_MIN_RAM: dict[str, dict[int, int]] = {
     "selectel": {
         # Selectel Standard Line constraints
-        2: 2,  # 2 vCPU: min 4GB
-        4: 4,  # 4 vCPU: min 8GB
+        2: 2,  # 2 vCPU: min 2GB
+        4: 4,  # 4 vCPU: min 4GB
         8: 8,  # 8 vCPU: min 8GB
         16: 32,  # 16 vCPU: min 32GB
+        32: 64,  # 32 vCPU: min 64GB
     },
     "timeweb": {},  # No known constraints
 }

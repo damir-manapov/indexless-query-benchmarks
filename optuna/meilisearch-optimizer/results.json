@@ -394,5 +394,34 @@
       "benchmark_s": 64.52174615859985,
       "trial_total_s": 261.4736089706421
     }
+  },
+  {
+    "trial": 11,
+    "timestamp": "2026-01-03T11:42:14.504522",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 16,
+      "ram_gb": 32,
+      "disk_type": "universal"
+    },
+    "config": {},
+    "cost_per_month": 18546,
+    "cost_efficiency": 0.14210089151852648,
+    "qps": 2635.403134102592,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 0,
+    "error_rate": 0.0,
+    "indexing_time_s": 9.766507625579834,
+    "error": null,
+    "timings": {
+      "terraform_s": 156.93871808052063,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 19.084548950195312,
+      "benchmark_s": 64.46887636184692,
+      "trial_total_s": 298.43638014793396
+    }
   }
 ]
