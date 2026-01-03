@@ -1,17 +1,25 @@
 # Meilisearch Benchmark Results - SELECTEL
 
-Generated: 2026-01-03 12:02:49
+Generated: 2026-01-03 12:42:50
 
 ## Results
 
 | # | CPU | RAM | Disk | Mem MB | Thr | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Idx (s) | ₽/mo | QPS/₽ |
 |--:|----:|----:|------|-------:|----:|----:|---------:|---------:|---------:|--------:|-----:|------:|
-| 1 | 4 | 16 | universal | 0 | 0 | 3101.7 | 31.0 | 37.0 | 0.0 | 15.9 | 6878 | 0.45 |
-| 2 | 2 | 32 | universal | 0 | 0 | 1688.9 | 65.0 | 79.0 | 0.0 | 26.1 | 9376 | 0.18 |
+| 1 | 32 | 64 | fast | 0 | 0 | 10494.2 | 2.0 | 3.0 | 0.0 | 7.9 | 36742 | 0.29 |
+| 2 | 32 | 64 | universal | 0 | 0 | 10124.9 | 2.0 | 4.0 | 0.0 | 10.0 | 36642 | 0.28 |
+| 3 | 16 | 32 | universal | 0 | 0 | 8397.1 | 5.0 | 7.0 | 0.0 | 9.8 | 18546 | 0.45 |
+| 4 | 16 | 64 | universal | 0 | 0 | 8247.4 | 5.0 | 7.0 | 0.0 | 9.8 | 26162 | 0.32 |
+| 5 | 8 | 32 | fast | 0 | 0 | 5159.1 | 14.0 | 18.0 | 0.0 | 9.8 | 13406 | 0.38 |
+| 6 | 8 | 16 | fast | 0 | 0 | 4845.6 | 15.0 | 20.0 | 0.0 | 18.0 | 9598 | 0.50 |
+| 7 | 4 | 16 | universal | 0 | 0 | 3101.7 | 31.0 | 37.0 | 0.0 | 15.9 | 6878 | 0.45 |
+| 8 | 4 | 64 | fast | 0 | 0 | 2946.9 | 33.0 | 39.0 | 0.0 | 15.9 | 18402 | 0.16 |
+| 9 | 2 | 16 | fast | 0 | 0 | 1736.9 | 63.0 | 75.0 | 0.0 | 24.1 | 5668 | 0.31 |
+| 10 | 2 | 32 | universal | 0 | 0 | 1688.9 | 65.0 | 79.0 | 0.0 | 26.1 | 9376 | 0.18 |
 
 ## Best Configurations
 
-- **Best by QPS:** 3101.7 QPS — `4cpu/16gb/universal`
-- **Best by p95 latency:** 37.0ms — `4cpu/16gb/universal`
-- **Best by indexing time:** 15.9s — `4cpu/16gb/universal`
-- **Best by cost efficiency:** 0.45 QPS/₽ — `4cpu/16gb/universal`
+- **Best by QPS:** 10494.2 QPS — `32cpu/64gb/fast`
+- **Best by p95 latency:** 3.0ms — `32cpu/64gb/fast`
+- **Best by indexing time:** 7.9s — `32cpu/64gb/fast`
+- **Best by cost efficiency:** 0.50 QPS/₽ — `8cpu/16gb/fast`
