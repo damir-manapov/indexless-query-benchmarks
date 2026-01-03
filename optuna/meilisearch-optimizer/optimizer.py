@@ -39,6 +39,7 @@ from common import (
     save_results,
     wait_for_vm_ready,
 )
+from pricing import get_cloud_pricing, validate_infra_config
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -51,23 +52,60 @@ MASTER_KEY = "benchmark-master-key-change-in-production"
 # Dataset config
 DATASET_SIZE = 500000  # 500K products
 
+TERRAFORM_BASE = Path(__file__).parent.parent.parent / "terraform"
+
 
 @dataclass
 class CloudConfig:
     name: str
     terraform_dir: Path
+    cpu_cost: float  # Cost per vCPU per hour
+    ram_cost: float  # Cost per GB RAM per hour
+    disk_cost_multipliers: dict[str, float]
+
+
+def _make_cloud_config(name: str) -> CloudConfig:
+    """Create CloudConfig using common pricing."""
+    pricing = get_cloud_pricing(name)
+    return CloudConfig(
+        name=name,
+        terraform_dir=TERRAFORM_BASE / name,
+        cpu_cost=pricing.cpu_cost,
+        ram_cost=pricing.ram_cost,
+        disk_cost_multipliers=pricing.disk_cost_multipliers,
+    )
+
+
+CLOUD_CONFIGS: dict[str, CloudConfig] = {
+    "selectel": _make_cloud_config("selectel"),
+    "timeweb": _make_cloud_config("timeweb"),
+}
 
 
 def get_cloud_config(cloud: str) -> CloudConfig:
-    base = Path(__file__).parent.parent.parent / "terraform"
-    return CloudConfig(
-        name=cloud.upper(),
-        terraform_dir=base / cloud,
-    )
+    if cloud not in CLOUD_CONFIGS:
+        raise ValueError(f"Unknown cloud: {cloud}. Available: {list(CLOUD_CONFIGS.keys())}")
+    return CLOUD_CONFIGS[cloud]
+
+
+def calculate_cost(infra_config: dict, cloud_config: CloudConfig) -> float:
+    """Estimate hourly cost for infrastructure configuration."""
+    cpu = infra_config.get("cpu", 0)
+    ram = infra_config.get("ram_gb", 0)
+    disk_type = infra_config.get("disk_type", "fast")
+    disk_size = 50  # Default boot disk size
+
+    cpu_cost = cpu * cloud_config.cpu_cost
+    ram_cost = ram * cloud_config.ram_cost
+    disk_cost = disk_size * cloud_config.disk_cost_multipliers.get(disk_type, 0.01)
+
+    return cpu_cost + ram_cost + disk_cost
 
 
 # Search spaces
 def get_infra_search_space():
+    # Selectel Standard Line: valid CPU/RAM combinations
+    # 2 vCPU: 4-16GB, 4 vCPU: 8-32GB, 8 vCPU: 16-32GB, 16 vCPU: 32GB only
     return {
         "cpu": [2, 4, 8, 16],
         "ram_gb": [4, 8, 16, 32],
@@ -524,6 +562,8 @@ def save_result(
             "trial_total_s": result.timings.trial_total_s,
         }
 
+    cost = calculate_cost(infra_config, cloud_config)
+
     results.append(
         {
             "trial": trial_num,
@@ -531,6 +571,7 @@ def save_result(
             "cloud": cloud,
             "infra": infra_config,
             "config": meili_config,
+            "cost_per_hour": cost,
             "qps": result.qps,
             "p50_ms": result.p50_ms,
             "p95_ms": result.p95_ms,
@@ -720,6 +761,11 @@ def objective_infra(
         "ram_gb": trial.suggest_categorical("ram_gb", space["ram_gb"]),
         "disk_type": trial.suggest_categorical("disk_type", space["disk_type"]),
     }
+
+    # Validate cloud constraints (e.g., 16 vCPU requires min 32GB RAM)
+    constraint_error = validate_infra_config(cloud, infra_config["cpu"], infra_config["ram_gb"])
+    if constraint_error:
+        raise optuna.TrialPruned(constraint_error)
 
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [infra]: {infra_config}")

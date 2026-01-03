@@ -53,6 +53,7 @@ from cloud_config import (
     get_config_search_space,
     get_infra_search_space,
 )
+from pricing import validate_infra_config
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -740,6 +741,11 @@ def objective_infra(
             "disk_size_gb", space["disk_size_gb"]
         ),
     }
+
+    # Validate cloud constraints (e.g., 16 vCPU requires min 32GB RAM)
+    constraint_error = validate_infra_config(cloud, infra_config["cpu"], infra_config["ram_gb"])
+    if constraint_error:
+        raise optuna.TrialPruned(constraint_error)
 
     # Use reasonable default Postgres config
     ram_gb = infra_config["ram_gb"]

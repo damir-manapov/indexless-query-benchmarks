@@ -23,11 +23,60 @@ optuna/
 class CloudConfig:
     name: str              # "selectel", "timeweb"
     terraform_dir: Path    # Path to terraform directory
+    cpu_cost: float        # Cost per vCPU per hour (from common pricing)
+    ram_cost: float        # Cost per GB RAM per hour
+    disk_cost_multipliers: dict[str, float]  # Per disk type
 
 def get_cloud_config(cloud: str) -> CloudConfig:
-    base = Path(__file__).parent.parent.parent / "terraform"
-    return CloudConfig(name=cloud.upper(), terraform_dir=base / cloud)
+    pricing = get_cloud_pricing(cloud)  # From common.py
+    return CloudConfig(
+        name=cloud,
+        terraform_dir=TERRAFORM_BASE / cloud,
+        cpu_cost=pricing.cpu_cost,
+        ram_cost=pricing.ram_cost,
+        disk_cost_multipliers=pricing.disk_cost_multipliers,
+    )
 ```
+
+### Common Pricing
+
+Cloud pricing rates are defined in `pricing.py` and shared across all optimizers:
+
+```python
+from pricing import get_cloud_pricing, CloudPricing
+
+# Returns CloudPricing(cpu_cost=655, ram_cost=238, disk_cost_multipliers={...})
+pricing = get_cloud_pricing("selectel")
+```
+
+| Cloud    | CPU (₽/vCPU/mo) | RAM (₽/GB/mo) | Disk (₽/GB/mo)                    |
+|----------|-----------------|---------------|-----------------------------------|
+| Selectel | 655             | 238           | fast: 11, universal: 9, basic: 7  |
+| Timeweb  | 220             | 180           | nvme: 5, ssd: 4, hdd: 2           |
+
+### Cloud Constraints
+
+Cloud providers have minimum RAM requirements per CPU. These constraints are defined in `pricing.py`:
+
+| vCPU | Min RAM (Selectel) |
+|------|---------------------|
+| 2    | 2 GB                |
+| 4    | 4 GB                |
+| 8    | 8 GB                |
+| 16   | 32 GB               |
+
+Use `validate_infra_config()` from `pricing.py` to prune invalid configs early:
+
+```python
+from pricing import validate_infra_config
+
+# In objective_infra():
+constraint_error = validate_infra_config(cloud, infra_config["cpu"], infra_config["ram_gb"])
+if constraint_error:
+    raise optuna.TrialPruned(constraint_error)
+```
+
+This is **required** for all optimizers with infrastructure optimization (`objective_infra`).
 
 ### Trial Timings Dataclass
 
@@ -448,13 +497,16 @@ raise optuna.TrialPruned()  # Not raise RuntimeError
 
 ## Checklist for New Optimizer
 
-- [ ] `CloudConfig` dataclass with terraform directory
-- [ ] `BenchmarkResult` dataclass with all metrics
+- [ ] `CloudConfig` dataclass with terraform directory and pricing (use `get_cloud_pricing()`)
+- [ ] `BenchmarkResult` dataclass with all metrics and `timings: TrialTimings`
+- [ ] `TrialTimings` dataclass for phase timing
+- [ ] `calculate_cost()` using common pricing rates
 - [ ] `get_infra_search_space()` and `get_config_search_space()`
 - [ ] `results_file()`, `config_to_key()`, `find_cached_result()`, `save_result()`
 - [ ] `ensure_infra()` with VM validation
 - [ ] `run_benchmark()` with timeout handling
 - [ ] `parse_*_output()` with error handling
-- [ ] `objective_infra()` and `objective_config()` (or single `objective()`)
+- [ ] `objective_infra()` with `validate_infra_config()` for cloud constraints
+- [ ] `objective_config()` (or single `objective()`)
 - [ ] CLI with `--cloud`, `--mode`, `--metric`, `--trials`, `--show-results`, `--destroy`
-- [ ] Trial pruning on failures
+- [ ] Trial pruning on failures and cached duplicates

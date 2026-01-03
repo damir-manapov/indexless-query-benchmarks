@@ -1,7 +1,11 @@
 """Cloud configuration for Postgres optimizer."""
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from pricing import get_cloud_pricing
 
 TERRAFORM_DIR = Path(__file__).parent.parent.parent / "terraform"
 
@@ -18,32 +22,22 @@ class CloudConfig:
     disk_cost_multipliers: dict[str, float] = field(default_factory=dict)
 
 
-# Selectel cloud config
-SELECTEL_CONFIG = CloudConfig(
-    name="selectel",
-    terraform_dir=TERRAFORM_DIR / "selectel",
-    disk_types=["fast", "universal", "basic"],
-    cpu_cost=0.5,
-    ram_cost=0.2,
-    disk_cost_multipliers={
-        "fast": 0.015,
-        "universal": 0.008,
-        "basic": 0.004,
-    },
-)
+def _make_config(name: str, terraform_subdir: str, disk_types: list[str]) -> CloudConfig:
+    """Create CloudConfig using common pricing."""
+    pricing = get_cloud_pricing(name)
+    return CloudConfig(
+        name=name,
+        terraform_dir=TERRAFORM_DIR / terraform_subdir,
+        disk_types=disk_types,
+        cpu_cost=pricing.cpu_cost,
+        ram_cost=pricing.ram_cost,
+        disk_cost_multipliers=pricing.disk_cost_multipliers,
+    )
 
-# Timeweb cloud config
-TIMEWEB_CONFIG = CloudConfig(
-    name="timeweb",
-    terraform_dir=TERRAFORM_DIR / "timeweb",
-    disk_types=["nvme", "hdd"],
-    cpu_cost=0.4,
-    ram_cost=0.15,
-    disk_cost_multipliers={
-        "nvme": 0.012,
-        "hdd": 0.003,
-    },
-)
+
+# Cloud configs using common pricing
+SELECTEL_CONFIG = _make_config("selectel", "selectel", ["fast", "universal", "basic"])
+TIMEWEB_CONFIG = _make_config("timeweb", "timeweb", ["nvme", "hdd"])
 
 
 def get_cloud_config(cloud: str) -> CloudConfig:

@@ -1,7 +1,11 @@
 """Cloud provider configurations for the optimizer."""
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from pricing import get_cloud_pricing
 
 
 @dataclass
@@ -16,7 +20,7 @@ class CloudConfig:
     boot_volume_resource: str | None
     data_volume_resource: str
     network_port_resource: str | None
-    # Cost factors (relative, for comparison)
+    # Cost factors (from common pricing)
     cpu_cost: float
     ram_cost: float
     disk_cost_multipliers: dict[str, float]
@@ -25,32 +29,49 @@ class CloudConfig:
 # Base path for terraform configs
 TERRAFORM_BASE = Path(__file__).parent.parent.parent / "terraform"
 
+# Terraform resource mappings per cloud
+_TERRAFORM_RESOURCES = {
+    "selectel": {
+        "instance_resource": "openstack_compute_instance_v2.minio",
+        "boot_volume_resource": "openstack_blockstorage_volume_v3.minio_boot",
+        "data_volume_resource": "openstack_blockstorage_volume_v3.minio_data",
+        "network_port_resource": "openstack_networking_port_v2.minio",
+    },
+    "timeweb": {
+        "instance_resource": "twc_server.minio",
+        "boot_volume_resource": None,
+        "data_volume_resource": "twc_server_disk.minio_data",
+        "network_port_resource": None,
+    },
+}
+
+_DISK_TYPES = {
+    "selectel": ["fast", "universal", "basic"],
+    "timeweb": ["nvme", "ssd", "hdd"],
+}
+
+
+def _make_config(name: str) -> CloudConfig:
+    """Create CloudConfig using common pricing."""
+    pricing = get_cloud_pricing(name)
+    resources = _TERRAFORM_RESOURCES[name]
+    return CloudConfig(
+        name=name,
+        terraform_dir=TERRAFORM_BASE / name,
+        disk_types=_DISK_TYPES[name],
+        instance_resource=resources["instance_resource"],
+        boot_volume_resource=resources["boot_volume_resource"],
+        data_volume_resource=resources["data_volume_resource"],
+        network_port_resource=resources["network_port_resource"],
+        cpu_cost=pricing.cpu_cost,
+        ram_cost=pricing.ram_cost,
+        disk_cost_multipliers=pricing.disk_cost_multipliers,
+    )
+
 
 CLOUD_CONFIGS: dict[str, CloudConfig] = {
-    "selectel": CloudConfig(
-        name="selectel",
-        terraform_dir=TERRAFORM_BASE / "selectel",
-        disk_types=["fast", "universal", "basic"],
-        instance_resource="openstack_compute_instance_v2.minio",
-        boot_volume_resource="openstack_blockstorage_volume_v3.minio_boot",
-        data_volume_resource="openstack_blockstorage_volume_v3.minio_data",
-        network_port_resource="openstack_networking_port_v2.minio",
-        cpu_cost=0.5,
-        ram_cost=0.1,
-        disk_cost_multipliers={"fast": 0.01, "universal": 0.005, "basic": 0.002},
-    ),
-    "timeweb": CloudConfig(
-        name="timeweb",
-        terraform_dir=TERRAFORM_BASE / "timeweb",
-        disk_types=["nvme", "ssd", "hdd"],
-        instance_resource="twc_server.minio",
-        boot_volume_resource=None,  # Timeweb doesn't use separate boot volumes
-        data_volume_resource="twc_server_disk.minio_data",
-        network_port_resource=None,  # Timeweb handles networking differently
-        cpu_cost=0.4,  # Slightly cheaper
-        ram_cost=0.08,
-        disk_cost_multipliers={"nvme": 0.012, "ssd": 0.008, "hdd": 0.003},
-    ),
+    "selectel": _make_config("selectel"),
+    "timeweb": _make_config("timeweb"),
 }
 
 

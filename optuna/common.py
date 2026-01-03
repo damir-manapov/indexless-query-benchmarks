@@ -8,6 +8,14 @@ from typing import Any
 
 from python_terraform import Terraform
 
+# Re-export pricing for backward compatibility
+from pricing import CloudPricing, get_cloud_pricing  # noqa: F401
+
+
+# ============================================================================
+# SSH Utilities
+# ============================================================================
+
 
 def run_ssh_command(
     vm_ip: str,
