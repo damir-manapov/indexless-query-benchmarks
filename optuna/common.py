@@ -33,12 +33,14 @@ def run_ssh_command(
         "UserKnownHostsFile=/dev/null",
         "-o",
         "ConnectTimeout=10",
+        "-o",
+        "LogLevel=ERROR",
     ]
     if forward_agent:
         ssh_args.append("-A")
     if jump_host:
         # Use ProxyCommand instead of -J to pass SSH options to jump host too
-        proxy_cmd = f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p root@{jump_host}"
+        proxy_cmd = f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -W %h:%p root@{jump_host}"
         ssh_args.extend(["-o", f"ProxyCommand={proxy_cmd}"])
     ssh_args.extend([f"root@{vm_ip}", command])
 
