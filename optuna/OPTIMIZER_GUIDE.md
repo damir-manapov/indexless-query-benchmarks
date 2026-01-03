@@ -23,15 +23,17 @@ optuna/
 class CloudConfig:
     name: str              # "selectel", "timeweb"
     terraform_dir: Path    # Path to terraform directory
+    disk_types: list[str]  # Available disk types (from pricing.py)
     cpu_cost: float        # Cost per vCPU per month (from common pricing)
     ram_cost: float        # Cost per GB RAM per month
     disk_cost_multipliers: dict[str, float]  # Per disk type
 
 def get_cloud_config(cloud: str) -> CloudConfig:
-    pricing = get_cloud_pricing(cloud)  # From common.py
+    pricing = get_cloud_pricing(cloud)  # From pricing.py
     return CloudConfig(
         name=cloud,
         terraform_dir=TERRAFORM_BASE / cloud,
+        disk_types=get_disk_types(cloud),  # Derived from pricing.py
         cpu_cost=pricing.cpu_cost,
         ram_cost=pricing.ram_cost,
         disk_cost_multipliers=pricing.disk_cost_multipliers,
@@ -43,6 +45,7 @@ def get_cloud_config(cloud: str) -> CloudConfig:
 Cloud pricing rates are defined in `pricing.py` and shared across all optimizers:
 
 ```python
+from pricing import get_cloud_pricing, get_disk_types
 from pricing import get_cloud_pricing, CloudPricing
 
 # Returns CloudPricing(cpu_cost=655, ram_cost=238, disk_cost_multipliers={...})
