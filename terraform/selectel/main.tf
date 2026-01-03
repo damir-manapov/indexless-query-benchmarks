@@ -75,7 +75,7 @@ data "openstack_images_image_v2" "ubuntu" {
 # Per Selectel docs: for arbitrary configs, create a flavor via openstack_compute_flavor_v2
 # Note: Flavors persist in OpenStack even after project is deleted, so we use stable naming
 resource "openstack_compute_flavor_v2" "benchmark" {
-  name      = "benchmark-optuna-${var.cpu_count}vcpu-${var.ram_gb}gb"
+  name      = "bench-opt-${var.cpu_count}vcpu-${var.ram_gb}gb"
   vcpus     = var.cpu_count
   ram       = var.ram_gb * 1024
   disk      = 0 # Using network boot disk
