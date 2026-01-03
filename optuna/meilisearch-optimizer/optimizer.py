@@ -336,7 +336,7 @@ def run_k6_benchmark(
 
     # Run k6
     k6_cmd = f"""
-k6 run /tmp/benchmark.js \\
+K6_SUMMARY_TREND_STATS="avg,min,med,max,p(90),p(95),p(99)" k6 run /tmp/benchmark.js \\
   -e MEILI_URL=http://{meili_ip}:7700 \\
   -e MEILI_KEY={MASTER_KEY} \\
   -e VUS={vus} \\
