@@ -94,3 +94,31 @@ The VM is automatically configured with:
 - warp (MinIO benchmark tool)
 - Clones and installs `indexless-query-benchmarks` repo
 - A `/root/benchmark-ready` marker file created when setup is complete
+
+## OpenStack CLI
+
+For debugging and manual operations (e.g., cleaning up stale flavors):
+
+```bash
+# Set environment variables
+export OS_AUTH_URL="https://cloud.api.selcloud.ru/identity/v3"
+export OS_IDENTITY_API_VERSION=3
+export OS_PROJECT_DOMAIN_NAME="$TF_VAR_selectel_domain"
+export OS_USER_DOMAIN_NAME="$TF_VAR_selectel_domain"
+export OS_PROJECT_ID="$(terraform output -raw project_id)"
+export OS_USERNAME="$TF_VAR_selectel_username"
+export OS_PASSWORD="$TF_VAR_selectel_password"
+export OS_REGION_NAME="ru-7"
+
+# List flavors
+openstack flavor list
+
+# List stale benchmark flavors
+openstack flavor list | grep benchmark
+
+# Delete stale flavor
+openstack flavor delete <flavor-id>
+
+# List volume types
+openstack volume type list
+```
