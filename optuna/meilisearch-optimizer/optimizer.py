@@ -798,16 +798,12 @@ def objective_infra(
     trial_start = time.time()
     timings = TrialTimings()
 
-    # Check cache
+    # Check cache - return cached value so Optuna learns from it
     cached = find_cached_result(infra_config, {}, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
-        print(
-            f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate"
-        )
-        trial.set_user_attr("cached", True)
-        trial.set_user_attr("cached_value", cached_value)
-        raise optuna.TrialPruned(f"Duplicate config, cached value: {cached_value:.2f}")
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
 
     # Destroy and recreate
     print("  Destroying previous VM...")
@@ -900,16 +896,12 @@ def objective_config(
     trial_start = time.time()
     timings = TrialTimings()
 
-    # Check cache
+    # Check cache - return cached value so Optuna learns from it
     cached = find_cached_result(infra_config, config, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
-        print(
-            f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate"
-        )
-        trial.set_user_attr("cached", True)
-        trial.set_user_attr("cached_value", cached_value)
-        raise optuna.TrialPruned(f"Duplicate config, cached value: {cached_value:.2f}")
+        print(f"  Using cached result: {cached_value:.2f} ({metric})")
+        return cached_value
 
     # Reconfigure and re-index
     if not reconfigure_meilisearch(meili_ip, config, jump_host=benchmark_ip):
