@@ -26,9 +26,12 @@ CLOUD_PRICING: dict[str, CloudPricing] = {
         cpu_cost=655,  # ₽/vCPU/month
         ram_cost=238,  # ₽/GB/month
         disk_cost_multipliers={
-            "fast": 11,  # ₽/GB/month - локальные NVMe
-            "universal": 9,  # ₽/GB/month - сетевые SSD
-            "basic": 7,  # ₽/GB/month - сетевые HDD
+            # Selectel disk types: https://docs.selectel.ru/cloud-servers/volumes/about-network-volumes/
+            "fast": 39,  # ₽/GB/month - SSD Быстрый (NVMe)
+            "universal2": 18,  # ₽/GB/month - SSD Универсальный v2 (+ IOPS billing)
+            "universal": 18,  # ₽/GB/month - SSD Универсальный
+            "basicssd": 9,  # ₽/GB/month - SSD Базовый
+            "basic": 7,  # ₽/GB/month - HDD Базовый
         },
     ),
     "timeweb": CloudPricing(

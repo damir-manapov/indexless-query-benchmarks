@@ -70,13 +70,13 @@ variable "disk_size_gb" {
 }
 
 variable "disk_type" {
-  description = "Disk type: fast, universal, basic, basic_hdd"
+  description = "Disk type: fast, universal2, universal, basicssd, basic"
   type        = string
   default     = "fast"
 
   validation {
-    condition     = contains(["fast", "universal", "basic", "basic_hdd"], var.disk_type)
-    error_message = "disk_type must be one of: fast, universal, basic, basic_hdd"
+    condition     = contains(["fast", "universal2", "universal", "basicssd", "basic"], var.disk_type)
+    error_message = "disk_type must be one of: fast, universal2, universal, basicssd, basic"
   }
 }
 

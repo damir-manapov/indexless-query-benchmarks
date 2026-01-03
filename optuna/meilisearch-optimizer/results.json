@@ -288,5 +288,133 @@
       "benchmark_s": 64.4813756942749,
       "trial_total_s": 297.3248097896576
     }
+  },
+  {
+    "trial": 0,
+    "timestamp": "2026-01-03T13:10:08.418029",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 32,
+      "ram_gb": 64,
+      "disk_type": "fast"
+    },
+    "config": {
+      "max_indexing_memory_mb": 512,
+      "max_indexing_threads": 8
+    },
+    "cost_per_month": 36742,
+    "cost_efficiency": 0.27991778108744814,
+    "qps": 10284.739112715019,
+    "p50_ms": 2,
+    "p95_ms": 4,
+    "p99_ms": 6,
+    "error_rate": 0.0,
+    "indexing_time_s": 10.061762571334839,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 19.35318613052368,
+      "benchmark_s": 64.7901496887207,
+      "trial_total_s": 97.89469790458679
+    }
+  },
+  {
+    "trial": 3,
+    "timestamp": "2026-01-03T13:14:18.559842",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 32,
+      "ram_gb": 64,
+      "disk_type": "fast"
+    },
+    "config": {
+      "max_indexing_memory_mb": 512,
+      "max_indexing_threads": 4
+    },
+    "cost_per_month": 36742,
+    "cost_efficiency": 0.28324571446835783,
+    "qps": 10407.014040996404,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 5,
+    "error_rate": 0.0,
+    "indexing_time_s": 11.920108795166016,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 21.286410570144653,
+      "benchmark_s": 65.08699536323547,
+      "trial_total_s": 100.08476066589355
+    }
+  },
+  {
+    "trial": 4,
+    "timestamp": "2026-01-03T13:15:59.663335",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 32,
+      "ram_gb": 64,
+      "disk_type": "fast"
+    },
+    "config": {
+      "max_indexing_memory_mb": 1024,
+      "max_indexing_threads": 4
+    },
+    "cost_per_month": 36742,
+    "cost_efficiency": 0.2831730819820066,
+    "qps": 10404.345378182885,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 5,
+    "error_rate": 0.0,
+    "indexing_time_s": 12.574416637420654,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 22.02180504798889,
+      "benchmark_s": 64.90081691741943,
+      "trial_total_s": 101.075186252594
+    }
+  },
+  {
+    "trial": 5,
+    "timestamp": "2026-01-03T13:17:44.501477",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 32,
+      "ram_gb": 64,
+      "disk_type": "fast"
+    },
+    "config": {
+      "max_indexing_memory_mb": 2048,
+      "max_indexing_threads": 2
+    },
+    "cost_per_month": 36742,
+    "cost_efficiency": 0.28351179214808453,
+    "qps": 10416.790267104921,
+    "p50_ms": 2,
+    "p95_ms": 3,
+    "p99_ms": 5,
+    "error_rate": 0.0,
+    "indexing_time_s": 16.026948928833008,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 25.529269695281982,
+      "benchmark_s": 64.93751788139343,
+      "trial_total_s": 104.81441020965576
+    }
   }
 ]

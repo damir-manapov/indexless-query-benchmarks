@@ -115,10 +115,16 @@ def calculate_cost(infra_config: dict, cloud_config: CloudConfig) -> float:
 def get_infra_search_space():
     # Selectel Standard Line: valid CPU/RAM combinations
     # 2 vCPU: 4-16GB, 4 vCPU: 8-32GB, 8 vCPU: 16-32GB, 16 vCPU: 32GB, 32 vCPU: 64GB
+    # Disk types per Selectel docs:
+    # - fast: SSD Быстрый (NVMe)
+    # - universal2: SSD Универсальный v2 (with IOPS billing)
+    # - universal: SSD Универсальный
+    # - basicssd: SSD Базовый
+    # - basic: HDD Базовый
     return {
         "cpu": [2, 4, 8, 16, 32],
         "ram_gb": [4, 8, 16, 32, 64],
-        "disk_type": ["fast", "universal"],  # NVMe vs SSD
+        "disk_type": ["fast", "universal2", "universal", "basicssd", "basic"],
     }
 
 
@@ -1093,9 +1099,12 @@ def main():
 
             # Phase 2: Config on best infra
             best_infra = study_infra.best_params
+            best_cpu = best_infra["cpu"]
+            # RAM param has CPU-specific name: ram_gb_cpu{cpu}
+            best_ram = best_infra.get(f"ram_gb_cpu{best_cpu}")
             infra_config = {
-                "cpu": best_infra["cpu"],
-                "ram_gb": best_infra["ram_gb"],
+                "cpu": best_cpu,
+                "ram_gb": best_ram,
                 "disk_type": best_infra["disk_type"],
             }
 
