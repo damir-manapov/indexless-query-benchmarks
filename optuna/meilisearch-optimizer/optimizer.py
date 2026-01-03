@@ -878,13 +878,17 @@ def objective_infra(
         indexing_time,
     )
 
-    # Return metric (minimize p95, maximize qps)
+    # Return metric (minimize p95/indexing_time, maximize qps/cost_efficiency)
     if metric == "p95_ms":
         return result.p95_ms
     elif metric == "qps":
         return result.qps
+    elif metric == "cost_efficiency":
+        return result.qps / cost if cost > 0 else 0
+    elif metric == "indexing_time":
+        return indexing_time
     else:
-        return result.p95_ms
+        return result.qps
 
 
 def objective_config(
@@ -976,10 +980,13 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
         return result.p95_ms
     elif metric == "qps":
         return result.qps
+    elif metric == "cost_efficiency":
+        cost = calculate_cost(infra_config, cloud)
+        return result.qps / cost if cost > 0 else 0
     elif metric == "indexing_time":
         return indexing_time
     else:
-        return result.p95_ms
+        return result.qps
 
 
 def main():
@@ -1002,8 +1009,8 @@ def main():
     parser.add_argument(
         "--metric",
         default="qps",
-        choices=["p95_ms", "qps", "indexing_time"],
-        help="Metric to optimize",
+        choices=["qps", "p95_ms", "cost_efficiency", "indexing_time"],
+        help="Metric to optimize (qps=throughput, p95_ms=latency, cost_efficiency=QPS/₽)",
     )
     parser.add_argument("--cpu", type=int, default=4, help="Fixed CPU for config mode")
     parser.add_argument(
