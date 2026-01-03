@@ -57,6 +57,14 @@ def get_cloud_pricing(cloud: str) -> CloudPricing:
     return CLOUD_PRICING[cloud]
 
 
+def get_disk_types(cloud: str) -> list[str]:
+    """Get available disk types for a cloud provider.
+
+    Disk types are derived from the disk_cost_multipliers keys.
+    """
+    return list(get_cloud_pricing(cloud).disk_cost_multipliers.keys())
+
+
 # ============================================================================
 # Cloud Constraints
 # ============================================================================

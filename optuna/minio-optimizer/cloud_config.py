@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from pricing import get_cloud_pricing
+from pricing import get_cloud_pricing, get_disk_types
 
 
 @dataclass
@@ -45,11 +45,6 @@ _TERRAFORM_RESOURCES = {
     },
 }
 
-_DISK_TYPES = {
-    "selectel": ["fast", "universal2", "universal", "basicssd", "basic"],
-    "timeweb": ["nvme", "ssd", "hdd"],
-}
-
 
 def _make_config(name: str) -> CloudConfig:
     """Create CloudConfig using common pricing."""
@@ -58,7 +53,7 @@ def _make_config(name: str) -> CloudConfig:
     return CloudConfig(
         name=name,
         terraform_dir=TERRAFORM_BASE / name,
-        disk_types=_DISK_TYPES[name],
+        disk_types=get_disk_types(name),
         instance_resource=resources["instance_resource"],
         boot_volume_resource=resources["boot_volume_resource"],
         data_volume_resource=resources["data_volume_resource"],

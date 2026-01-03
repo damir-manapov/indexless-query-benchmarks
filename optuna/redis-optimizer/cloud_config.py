@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from pricing import get_cloud_pricing
+from pricing import get_cloud_pricing, get_disk_types
 
 TERRAFORM_DIR = Path(__file__).parent.parent.parent / "terraform"
 
@@ -22,15 +22,13 @@ class CloudConfig:
     disk_cost_multipliers: dict[str, float] = field(default_factory=dict)
 
 
-def _make_config(
-    name: str, terraform_subdir: str, disk_types: list[str]
-) -> CloudConfig:
+def _make_config(name: str, terraform_subdir: str) -> CloudConfig:
     """Create CloudConfig using common pricing."""
     pricing = get_cloud_pricing(name)
     return CloudConfig(
         name=name,
         terraform_dir=TERRAFORM_DIR / terraform_subdir,
-        disk_types=disk_types,
+        disk_types=get_disk_types(name),
         cpu_cost=pricing.cpu_cost,
         ram_cost=pricing.ram_cost,
         disk_cost_multipliers=pricing.disk_cost_multipliers,
@@ -38,8 +36,8 @@ def _make_config(
 
 
 # Cloud configs using common pricing
-SELECTEL_CONFIG = _make_config("selectel", "selectel", ["fast", "universal", "basic"])
-TIMEWEB_CONFIG = _make_config("timeweb", "timeweb", ["nvme", "hdd"])
+SELECTEL_CONFIG = _make_config("selectel", "selectel")
+TIMEWEB_CONFIG = _make_config("timeweb", "timeweb")
 
 
 def get_cloud_config(cloud: str) -> CloudConfig:
