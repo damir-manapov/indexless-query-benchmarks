@@ -40,7 +40,7 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
-from pricing import filter_valid_ram
+from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -469,18 +469,16 @@ def parse_memtier_output(output: str, duration: float) -> BenchmarkResult:
     return result
 
 
-def calculate_cost(config: dict, cloud_config: CloudConfig) -> float:
+def calculate_cost(config: dict, cloud: str) -> float:
     """Estimate monthly cost for the configuration."""
     nodes = 1 if config["mode"] == "single" else 3
-    cpu = config["cpu_per_node"]
-    ram = config["ram_per_node"]
-
-    cpu_cost = cpu * cloud_config.cpu_cost
-    ram_cost = ram * cloud_config.ram_cost
-    # Redis uses fast SSD for boot only (50GB)
-    storage_cost = 50 * cloud_config.disk_cost_multipliers.get("fast", 0.015)
-
-    return nodes * (cpu_cost + ram_cost + storage_cost)
+    return calculate_vm_cost(
+        cloud=cloud,
+        cpu=config["cpu_per_node"],
+        ram_gb=config["ram_per_node"],
+        disks=[DiskConfig(size_gb=50, disk_type="fast")],
+        nodes=nodes,
+    )
 
 
 def save_result(
@@ -493,7 +491,7 @@ def save_result(
     """Save benchmark result to JSON file."""
     results = load_results(results_file())
 
-    cost = calculate_cost(config, cloud_config)
+    cost = calculate_cost(config, cloud)
     cost_efficiency = result.ops_per_sec / cost if cost > 0 else 0
 
     timings_dict = None
@@ -559,7 +557,9 @@ def objective(
     config = {
         "mode": trial.suggest_categorical("mode", config_space["mode"]),
         "cpu_per_node": cpu_per_node,
-        "ram_per_node": trial.suggest_categorical(f"ram_per_node_cpu{cpu_per_node}", valid_ram),
+        "ram_per_node": trial.suggest_categorical(
+            f"ram_per_node_cpu{cpu_per_node}", valid_ram
+        ),
         "maxmemory_policy": trial.suggest_categorical(
             "maxmemory_policy", config_space["maxmemory_policy"]
         ),
@@ -611,7 +611,7 @@ def objective(
     result.timings = timings
     save_result(result, config, trial.number, cloud, cloud_config)
 
-    cost = calculate_cost(config, cloud_config)
+    cost = calculate_cost(config, cloud)
     result_metrics = {
         "ops_per_sec": result.ops_per_sec,
         "p99_latency_ms": result.p99_latency_ms,
@@ -773,7 +773,7 @@ Examples:
             else:
                 print(f"Best {args.metric}: N/A")
 
-            best_cost = calculate_cost(best.params, cloud_config)
+            best_cost = calculate_cost(best.params, cloud)
             print(f"Best config cost: {best_cost:.2f}/hr")
         except ValueError:
             print("No successful trials completed")

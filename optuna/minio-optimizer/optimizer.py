@@ -43,7 +43,7 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
-from pricing import filter_valid_ram
+from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -801,21 +801,21 @@ def run_system_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> SystemBaseli
     return SystemBaseline(fio=fio_result, sysbench=sysbench_result)
 
 
-def calculate_cost(config: dict, cloud_config: CloudConfig) -> float:
+def calculate_cost(config: dict, cloud: str) -> float:
     """Estimate monthly cost for the configuration."""
-    nodes = config["nodes"]
-    cpu = config["cpu_per_node"]
-    ram = config["ram_per_node"]
-    drives = config["drives_per_node"]
-    drive_size = config["drive_size_gb"]
-    drive_type = config["drive_type"]
-
-    cpu_cost = cpu * cloud_config.cpu_cost
-    ram_cost = ram * cloud_config.ram_cost
-    disk_mult = cloud_config.disk_cost_multipliers.get(drive_type, 0.01)
-    storage_cost = drives * drive_size * disk_mult
-
-    return nodes * (cpu_cost + ram_cost + storage_cost)
+    return calculate_vm_cost(
+        cloud=cloud,
+        cpu=config["cpu_per_node"],
+        ram_gb=config["ram_per_node"],
+        disks=[
+            DiskConfig(
+                size_gb=config["drive_size_gb"],
+                disk_type=config["drive_type"],
+                count=config["drives_per_node"],
+            )
+        ],
+        nodes=config["nodes"],
+    )
 
 
 def save_result(
@@ -829,7 +829,7 @@ def save_result(
     results = load_results(results_file())
 
     total_drives = config["nodes"] * config["drives_per_node"]
-    cost = calculate_cost(config, cloud_config)
+    cost = calculate_cost(config, cloud)
     cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
 
     # Build baseline metrics dict if available
@@ -911,7 +911,9 @@ def objective(
     config = {
         "nodes": trial.suggest_categorical("nodes", config_space["nodes"]),
         "cpu_per_node": cpu_per_node,
-        "ram_per_node": trial.suggest_categorical(f"ram_per_node_cpu{cpu_per_node}", valid_ram),
+        "ram_per_node": trial.suggest_categorical(
+            f"ram_per_node_cpu{cpu_per_node}", valid_ram
+        ),
         "drives_per_node": trial.suggest_categorical(
             "drives_per_node", config_space["drives_per_node"]
         ),
@@ -996,7 +998,7 @@ def objective(
     result.timings = timings
     save_result(result, config, trial.number, cloud, cloud_config)
 
-    cost = calculate_cost(config, cloud_config)
+    cost = calculate_cost(config, cloud)
     cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
     result_metrics = {
         "total_mib_s": result.total_mib_s,

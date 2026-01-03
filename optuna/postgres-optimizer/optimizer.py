@@ -53,7 +53,7 @@ from cloud_config import (
     get_config_search_space,
     get_infra_search_space,
 )
-from pricing import filter_valid_ram
+from pricing import DiskConfig, calculate_vm_cost, filter_valid_ram
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -497,18 +497,17 @@ def parse_pgbench_output(output: str, duration: float) -> BenchmarkResult:
     return result
 
 
-def calculate_cost(infra_config: dict, cloud_config: CloudConfig) -> float:
-    """Estimate hourly cost for the configuration."""
-    cpu = infra_config.get("cpu", 4)
-    ram = infra_config.get("ram_gb", 16)
-    disk_size = infra_config.get("disk_size_gb", 100)
-    disk_type = infra_config.get("disk_type", "nvme")
-
-    cpu_cost = cpu * cloud_config.cpu_cost
-    ram_cost = ram * cloud_config.ram_cost
-    disk_cost = disk_size * cloud_config.disk_cost_multipliers.get(disk_type, 0.01)
-
-    return cpu_cost + ram_cost + disk_cost
+def calculate_cost(infra_config: dict, cloud: str) -> float:
+    """Estimate monthly cost for the configuration."""
+    return calculate_vm_cost(
+        cloud=cloud,
+        cpu=infra_config.get("cpu", 4),
+        ram_gb=infra_config.get("ram_gb", 16),
+        disks=[DiskConfig(
+            size_gb=infra_config.get("disk_size_gb", 100),
+            disk_type=infra_config.get("disk_type", "fast"),
+        )],
+    )
 
 
 def save_result(
@@ -523,7 +522,7 @@ def save_result(
     """Save benchmark result to JSON file."""
     results = load_results(results_file())
 
-    cost = calculate_cost(infra_config, cloud_config)
+    cost = calculate_cost(infra_config, cloud)
     cost_efficiency = result.tps / cost if cost > 0 else 0
 
     timings_dict = None
@@ -833,7 +832,7 @@ def objective_infra(
         {
             "tps": result.tps,
             "latency_avg_ms": result.latency_avg_ms,
-            "cost_efficiency": result.tps / calculate_cost(infra_config, cloud_config),
+            "cost_efficiency": result.tps / calculate_cost(infra_config, cloud),
         },
         metric,
     )
@@ -937,7 +936,7 @@ def objective_config(
         {
             "tps": result.tps,
             "latency_avg_ms": result.latency_avg_ms,
-            "cost_efficiency": result.tps / calculate_cost(infra_config, cloud_config),
+            "cost_efficiency": result.tps / calculate_cost(infra_config, cloud),
         },
         metric,
     )

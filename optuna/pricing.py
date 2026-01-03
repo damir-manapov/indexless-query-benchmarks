@@ -103,3 +103,52 @@ def filter_valid_ram(cloud: str, cpu: int, ram_options: list[int]) -> list[int]:
     valid = [r for r in ram_options if r >= min_ram]
     # Fallback to all options if no constraints or empty result
     return valid if valid else ram_options
+
+
+# ============================================================================
+# Cost Calculation
+# ============================================================================
+
+
+@dataclass
+class DiskConfig:
+    """Disk configuration for cost calculation."""
+
+    size_gb: int
+    disk_type: str = "fast"
+    count: int = 1  # Number of disks of this type
+
+
+def calculate_vm_cost(
+    cloud: str,
+    cpu: int,
+    ram_gb: int,
+    disks: list[DiskConfig] | None = None,
+    nodes: int = 1,
+) -> float:
+    """Calculate monthly cost for VM(s).
+
+    Args:
+        cloud: Cloud provider name
+        cpu: vCPUs per node
+        ram_gb: RAM in GB per node
+        disks: List of disk configs per node (default: 50GB fast disk)
+        nodes: Number of nodes (for clustered setups)
+
+    Returns:
+        Monthly cost in ₽
+    """
+    pricing = get_cloud_pricing(cloud)
+
+    if disks is None:
+        disks = [DiskConfig(size_gb=50, disk_type="fast")]
+
+    cpu_cost = cpu * pricing.cpu_cost
+    ram_cost = ram_gb * pricing.ram_cost
+
+    disk_cost = 0.0
+    for disk in disks:
+        multiplier = pricing.disk_cost_multipliers.get(disk.disk_type, 0.01)
+        disk_cost += disk.size_gb * disk.count * multiplier
+
+    return nodes * (cpu_cost + ram_cost + disk_cost)
