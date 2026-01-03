@@ -827,7 +827,7 @@ def objective_infra(
 
     # Run benchmark with fixed VUs for fair comparison across configs
     benchmark_start = time.time()
-    vus = 64  # Fixed VUs to saturate all configs equally
+    vus = 128  # Fixed VUs to saturate all configs equally
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
     timings.benchmark_s = time.time() - benchmark_start
 
@@ -924,7 +924,7 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
 
     # Run benchmark with fixed VUs for fair comparison across configs
     benchmark_start = time.time()
-    vus = 64  # Fixed VUs to saturate all configs equally
+    vus = 128  # Fixed VUs to saturate all configs equally
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
     timings.benchmark_s = time.time() - benchmark_start
 
