@@ -67,13 +67,14 @@ uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode infra -
 
 ## Metrics
 
-| Metric        | Direction | Default | Description             |
-| ------------- | --------- | ------- | ----------------------- |
-| qps           | Maximize  | ✓       | Queries per second      |
-| p95_ms        | Minimize  |         | 95th percentile latency |
-| indexing_time | Minimize  |         | Time to index 500K docs |
+| Metric          | Direction | Default | Description             |
+| --------------- | --------- | ------- | ----------------------- |
+| qps             | Maximize  | ✓       | Queries per second      |
+| p95_ms          | Minimize  |         | 95th percentile latency |
+| cost_efficiency | Maximize  |         | QPS per ₽/mo            |
+| indexing_time   | Minimize  |         | Time to index 500K docs |
 
-Use `--metric p95_ms` or `--metric indexing_time` to optimize for different goals.
+Use `--metric p95_ms`, `--metric cost_efficiency`, or `--metric indexing_time` to optimize for different goals.
 
 ### Trial Timings
 

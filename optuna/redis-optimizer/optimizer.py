@@ -87,7 +87,7 @@ def format_results(cloud: str) -> dict | None:
                 "persist": cfg.get("persistence", "?"),
                 "ops": r.get("ops_per_sec", 0),
                 "p99": r.get("p99_latency_ms", 0),
-                "cost": r.get("cost_per_hour", 0),
+                "cost": r.get("cost_per_month", 0),
                 "eff": r.get("cost_efficiency", 0),
             }
         )
@@ -470,7 +470,7 @@ def parse_memtier_output(output: str, duration: float) -> BenchmarkResult:
 
 
 def calculate_cost(config: dict, cloud_config: CloudConfig) -> float:
-    """Estimate hourly cost for the configuration."""
+    """Estimate monthly cost for the configuration."""
     nodes = 1 if config["mode"] == "single" else 3
     cpu = config["cpu_per_node"]
     ram = config["ram_per_node"]
@@ -511,7 +511,7 @@ def save_result(
             "cloud": cloud,
             "config": config,
             "nodes": 1 if config["mode"] == "single" else 3,
-            "cost_per_hour": cost,
+            "cost_per_month": cost,
             "cost_efficiency": cost_efficiency,
             "ops_per_sec": result.ops_per_sec,
             "avg_latency_ms": result.avg_latency_ms,
@@ -559,7 +559,7 @@ def objective(
     config = {
         "mode": trial.suggest_categorical("mode", config_space["mode"]),
         "cpu_per_node": cpu_per_node,
-        "ram_per_node": trial.suggest_categorical("ram_per_node", valid_ram),
+        "ram_per_node": trial.suggest_categorical(f"ram_per_node_cpu{cpu_per_node}", valid_ram),
         "maxmemory_policy": trial.suggest_categorical(
             "maxmemory_policy", config_space["maxmemory_policy"]
         ),

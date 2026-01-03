@@ -46,6 +46,13 @@ STUDY_DB = RESULTS_DIR / "study.db"
 BENCHMARK_SCRIPT = RESULTS_DIR / "benchmark.js"
 DATASET_SCRIPT = RESULTS_DIR / "dataset.py"
 
+# Available optimization metrics
+METRICS = {
+    "qps": "Queries per second (higher is better)",
+    "p95_ms": "95th percentile latency in ms (lower is better)",
+    "cost_efficiency": "QPS per ₽/mo (higher is better)",
+}
+
 # Meilisearch master key (must match terraform)
 MASTER_KEY = "benchmark-master-key-change-in-production"
 
@@ -59,8 +66,8 @@ TERRAFORM_BASE = Path(__file__).parent.parent.parent / "terraform"
 class CloudConfig:
     name: str
     terraform_dir: Path
-    cpu_cost: float  # Cost per vCPU per hour
-    ram_cost: float  # Cost per GB RAM per hour
+    cpu_cost: float  # Cost per vCPU per month
+    ram_cost: float  # Cost per GB RAM per month
     disk_cost_multipliers: dict[str, float]
 
 
@@ -91,7 +98,7 @@ def get_cloud_config(cloud: str) -> CloudConfig:
 
 
 def calculate_cost(infra_config: dict, cloud_config: CloudConfig) -> float:
-    """Estimate hourly cost for infrastructure configuration."""
+    """Estimate monthly cost for infrastructure configuration."""
     cpu = infra_config.get("cpu", 0)
     ram = infra_config.get("ram_gb", 0)
     disk_type = infra_config.get("disk_type", "fast")
@@ -565,6 +572,7 @@ def save_result(
         }
 
     cost = calculate_cost(infra_config, cloud_config)
+    cost_efficiency = result.qps / cost if cost > 0 else 0
 
     results.append(
         {
@@ -573,7 +581,8 @@ def save_result(
             "cloud": cloud,
             "infra": infra_config,
             "config": meili_config,
-            "cost_per_hour": cost,
+            "cost_per_month": cost,
+            "cost_efficiency": cost_efficiency,
             "qps": result.qps,
             "p50_ms": result.p50_ms,
             "p95_ms": result.p95_ms,
@@ -630,6 +639,8 @@ def format_results(cloud: str) -> dict | None:
                 "p95": r.get("p95_ms", 0),
                 "p99": r.get("p99_ms", 0),
                 "idx_time": r.get("indexing_time_s", 0),
+                "cost": r.get("cost_per_month", 0),
+                "eff": r.get("cost_efficiency", 0),
             }
         )
 
@@ -644,6 +655,7 @@ def format_results(cloud: str) -> dict | None:
         key=lambda x: x.get("indexing_time_s", float("inf")),
         default=best_qps,
     )
+    best_eff = max(results, key=lambda x: x.get("cost_efficiency", 0))
 
     return {
         "cloud": cloud,
@@ -661,6 +673,10 @@ def format_results(cloud: str) -> dict | None:
                 "value": best_idx.get("indexing_time_s", 0),
                 "config": config_summary(best_idx),
             },
+            "cost_efficiency": {
+                "value": best_eff.get("cost_efficiency", 0),
+                "config": config_summary(best_eff),
+            },
         },
     }
 
@@ -673,34 +689,38 @@ def show_results(cloud: str) -> None:
         print(f"No results found for {cloud}")
         return
 
-    print(f"\n{'=' * 100}")
+    print(f"\n{'=' * 120}")
     print(f"Meilisearch Benchmark Results - {cloud.upper()}")
-    print(f"{'=' * 100}")
+    print(f"{'=' * 120}")
 
     print(
         f"{'#':>3} {'CPU':>4} {'RAM':>4} {'Disk':<9} {'Mem MB':>7} {'Thr':>4} "
-        f"{'QPS':>8} {'p50':>7} {'p95':>7} {'p99':>7} {'Idx(s)':>8}"
+        f"{'QPS':>8} {'p50':>7} {'p95':>7} {'p99':>7} {'Idx(s)':>8} {'₽/mo':>7} {'QPS/₽':>7}"
     )
-    print("-" * 100)
+    print("-" * 120)
 
     for i, r in enumerate(data["rows"], 1):
         print(
             f"{i:>3} {r['cpu']:>4} {r['ram']:>4} {r['disk']:<9} {r['mem_mb']:>7} {r['threads']:>4} "
-            f"{r['qps']:>8.1f} {r['p50']:>7.1f} {r['p95']:>7.1f} {r['p99']:>7.1f} {r['idx_time']:>8.1f}"
+            f"{r['qps']:>8.1f} {r['p50']:>7.1f} {r['p95']:>7.1f} {r['p99']:>7.1f} {r['idx_time']:>8.1f} "
+            f"{r['cost']:>7.0f} {r['eff']:>7.2f}"
         )
 
-    print("-" * 100)
+    print("-" * 120)
     print(f"Total: {len(data['rows'])} results")
 
     best = data["best"]
     print(
-        f"\nBest by QPS:      {best['qps']['value']:>8.1f} {'QPS':<6} [{best['qps']['config']}]"
+        f"\nBest by QPS:        {best['qps']['value']:>8.1f} {'QPS':<6} [{best['qps']['config']}]"
     )
     print(
-        f"Best by p95:      {best['p95']['value']:>8.1f} {'ms':<6} [{best['p95']['config']}]"
+        f"Best by p95:        {best['p95']['value']:>8.1f} {'ms':<6} [{best['p95']['config']}]"
     )
     print(
-        f"Best by indexing: {best['indexing']['value']:>8.1f} {'sec':<6} [{best['indexing']['config']}]"
+        f"Best by indexing:   {best['indexing']['value']:>8.1f} {'sec':<6} [{best['indexing']['config']}]"
+    )
+    print(
+        f"Best by efficiency: {best['cost_efficiency']['value']:>8.2f} {'QPS/₽':<6} [{best['cost_efficiency']['config']}]"
     )
 
 
@@ -722,14 +742,15 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
         "",
         "## Results",
         "",
-        "| # | CPU | RAM | Disk | Mem MB | Thr | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Idx (s) |",
-        "|--:|----:|----:|------|-------:|----:|----:|---------:|---------:|---------:|--------:|",
+        "| # | CPU | RAM | Disk | Mem MB | Thr | QPS | p50 (ms) | p95 (ms) | p99 (ms) | Idx (s) | ₽/mo | QPS/₽ |",
+        "|--:|----:|----:|------|-------:|----:|----:|---------:|---------:|---------:|--------:|-----:|------:|",
     ]
 
     for i, r in enumerate(data["rows"], 1):
         lines.append(
             f"| {i} | {r['cpu']} | {r['ram']} | {r['disk']} | {r['mem_mb']} | {r['threads']} | "
-            f"{r['qps']:.1f} | {r['p50']:.1f} | {r['p95']:.1f} | {r['p99']:.1f} | {r['idx_time']:.1f} |"
+            f"{r['qps']:.1f} | {r['p50']:.1f} | {r['p95']:.1f} | {r['p99']:.1f} | {r['idx_time']:.1f} | "
+            f"{r['cost']:.0f} | {r['eff']:.2f} |"
         )
 
     best = data["best"]
@@ -741,6 +762,7 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
             f"- **Best by QPS:** {best['qps']['value']:.1f} QPS — `{best['qps']['config']}`",
             f"- **Best by p95 latency:** {best['p95']['value']:.1f}ms — `{best['p95']['config']}`",
             f"- **Best by indexing time:** {best['indexing']['value']:.1f}s — `{best['indexing']['config']}`",
+            f"- **Best by cost efficiency:** {best['cost_efficiency']['value']:.2f} QPS/₽ — `{best['cost_efficiency']['config']}`",
             "",
         ]
     )
@@ -759,17 +781,19 @@ def objective_infra(
     space = get_infra_search_space()
 
     # Select CPU first, then filter valid RAM options for that CPU
+    # Use CPU-specific parameter name to avoid Optuna's "dynamic value space" error
     cpu = trial.suggest_categorical("cpu", space["cpu"])
     valid_ram = filter_valid_ram(cloud, cpu, space["ram_gb"])
 
     infra_config = {
         "cpu": cpu,
-        "ram_gb": trial.suggest_categorical("ram_gb", valid_ram),
+        "ram_gb": trial.suggest_categorical(f"ram_gb_cpu{cpu}", valid_ram),
         "disk_type": trial.suggest_categorical("disk_type", space["disk_type"]),
     }
 
+    cost = calculate_cost(infra_config, cloud_config)
     print(f"\n{'=' * 60}")
-    print(f"Trial {trial.number} [infra]: {infra_config}")
+    print(f"Trial {trial.number} [infra]: {infra_config} @ {cost:.0f} ₽/mo")
     print(f"{'=' * 60}")
     trial_start = time.time()
     timings = TrialTimings()
@@ -822,7 +846,8 @@ def objective_infra(
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
 
-    print(f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms")
+    eff = result.qps / cost if cost > 0 else 0
+    print(f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, efficiency={eff:.2f} QPS/₽")
     print(
         f"  Timings: infra={timings.terraform_s:.0f}s, index={timings.indexing_s:.0f}s, "
         f"bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
@@ -868,8 +893,9 @@ def objective_config(
         ),
     }
 
+    cost = calculate_cost(infra_config, cloud_config)
     print(f"\n{'=' * 60}")
-    print(f"Trial {trial.number} [config]: {config}")
+    print(f"Trial {trial.number} [config]: {config} @ {cost:.0f} ₽/mo")
     print(f"{'=' * 60}")
     trial_start = time.time()
     timings = TrialTimings()
@@ -917,8 +943,9 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
     timings.trial_total_s = time.time() - trial_start
     result.timings = timings
 
+    eff = result.qps / cost if cost > 0 else 0
     print(
-        f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, indexing={indexing_time:.1f}s"
+        f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, idx={indexing_time:.1f}s, eff={eff:.2f} QPS/₽"
     )
     print(
         f"  Timings: index={timings.indexing_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"

@@ -23,8 +23,8 @@ optuna/
 class CloudConfig:
     name: str              # "selectel", "timeweb"
     terraform_dir: Path    # Path to terraform directory
-    cpu_cost: float        # Cost per vCPU per hour (from common pricing)
-    ram_cost: float        # Cost per GB RAM per hour
+    cpu_cost: float        # Cost per vCPU per month (from common pricing)
+    ram_cost: float        # Cost per GB RAM per month
     disk_cost_multipliers: dict[str, float]  # Per disk type
 
 def get_cloud_config(cloud: str) -> CloudConfig:
@@ -76,10 +76,23 @@ valid_ram = filter_valid_ram(cloud, cpu, space["ram_gb"])
 
 infra_config = {
     "cpu": cpu,
-    "ram_gb": trial.suggest_categorical("ram_gb", valid_ram),
+    # IMPORTANT: Use CPU-specific parameter name for RAM!
+    # Optuna's CategoricalDistribution doesn't support dynamic value spaces.
+    # Using f"ram_gb_cpu{cpu}" creates separate distributions per CPU.
+    "ram_gb": trial.suggest_categorical(f"ram_gb_cpu{cpu}", valid_ram),
     ...
 }
 ```
+
+**Why CPU-specific RAM parameter names?**
+
+Optuna's `CategoricalDistribution` rejects different choice sets for the same parameter name
+when using RDB storage (`study.db`). For example, if trial 1 uses `ram_gb=[4,8,16,32]` for cpu=4,
+and trial 2 tries to use `ram_gb=[32]` for cpu=16, Optuna throws:
+`CategoricalDistribution does not support dynamic value space`
+
+The solution is to use CPU-specific names like `ram_gb_cpu4`, `ram_gb_cpu16` so each CPU
+configuration gets its own fixed distribution.
 
 This approach is better than pruning because:
 
@@ -198,10 +211,15 @@ def find_cached_result(infra: dict, config: dict, cloud: str) -> dict | None:
     return None
 
 def save_result(cloud: str, infra: dict, config: dict,
-                result: BenchmarkResult, trial_num: int) -> None:
+                result: BenchmarkResult, trial_num: int,
+                cloud_config: CloudConfig) -> None:
     """Save benchmark result to cache."""
     path = results_file()
     results = load_results(path)
+
+    # Calculate cost and efficiency
+    cost = calculate_cost(infra, cloud_config)
+    cost_efficiency = result.throughput / cost if cost > 0 else 0
 
     # Convert timings to dict for JSON serialization
     timings_dict = None
@@ -219,6 +237,8 @@ def save_result(cloud: str, infra: dict, config: dict,
         "cloud": cloud,  # Store cloud for key matching
         "infra": infra,
         "config": config,
+        "cost_per_month": cost,           # ₽/mo for this config
+        "cost_efficiency": cost_efficiency,  # throughput per ₽/mo
         "metrics": {
             "throughput": result.throughput,
             "latency_p95_ms": result.latency_p95_ms,

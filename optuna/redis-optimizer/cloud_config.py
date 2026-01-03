@@ -17,8 +17,8 @@ class CloudConfig:
     name: str
     terraform_dir: Path
     disk_types: list[str]
-    cpu_cost: float  # Cost per vCPU per hour
-    ram_cost: float  # Cost per GB RAM per hour
+    cpu_cost: float  # Cost per vCPU per month
+    ram_cost: float  # Cost per GB RAM per month
     disk_cost_multipliers: dict[str, float] = field(default_factory=dict)
 
 

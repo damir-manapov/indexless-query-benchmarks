@@ -89,7 +89,7 @@ def format_results(cloud: str) -> dict | None:
                 "total": r.get("total_mib_s", 0),
                 "get": r.get("get_mib_s", 0),
                 "put": r.get("put_mib_s", 0),
-                "cost": r.get("cost_per_hour", 0),
+                "cost": r.get("cost_per_month", 0),
                 "eff": r.get("cost_efficiency", 0),
             }
         )
@@ -802,7 +802,7 @@ def run_system_baseline(vm_ip: str, minio_ip: str = "10.0.0.10") -> SystemBaseli
 
 
 def calculate_cost(config: dict, cloud_config: CloudConfig) -> float:
-    """Estimate hourly cost for the configuration."""
+    """Estimate monthly cost for the configuration."""
     nodes = config["nodes"]
     cpu = config["cpu_per_node"]
     ram = config["ram_per_node"]
@@ -874,7 +874,7 @@ def save_result(
             "cloud": cloud,
             "config": config,
             "total_drives": total_drives,
-            "cost_per_hour": cost,
+            "cost_per_month": cost,
             "cost_efficiency": cost_efficiency,
             "total_mib_s": result.total_mib_s,
             "get_mib_s": result.get_mib_s,
@@ -911,7 +911,7 @@ def objective(
     config = {
         "nodes": trial.suggest_categorical("nodes", config_space["nodes"]),
         "cpu_per_node": cpu_per_node,
-        "ram_per_node": trial.suggest_categorical("ram_per_node", valid_ram),
+        "ram_per_node": trial.suggest_categorical(f"ram_per_node_cpu{cpu_per_node}", valid_ram),
         "drives_per_node": trial.suggest_categorical(
             "drives_per_node", config_space["drives_per_node"]
         ),

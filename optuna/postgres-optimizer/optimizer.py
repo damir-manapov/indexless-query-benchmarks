@@ -545,7 +545,7 @@ def save_result(
             "mode": mode,
             "infra_config": infra_config,
             "pg_config": pg_config,
-            "cost_per_hour": cost,
+            "cost_per_month": cost,
             "cost_efficiency": cost_efficiency,
             "tps": result.tps,
             "latency_avg_ms": result.latency_avg_ms,
@@ -609,7 +609,7 @@ def format_results(cloud: str) -> dict | None:
                 "mc": pg.get("max_connections", 0),
                 "tps": r.get("tps", 0),
                 "lat": r.get("latency_avg_ms", 0),
-                "cost": r.get("cost_per_hour", 0),
+                "cost": r.get("cost_per_month", 0),
                 "eff": r.get("cost_efficiency", 0),
             }
         )
@@ -739,7 +739,7 @@ def objective_infra(
     infra_config = {
         "mode": trial.suggest_categorical("mode", space["mode"]),
         "cpu": cpu,
-        "ram_gb": trial.suggest_categorical("ram_gb", valid_ram),
+        "ram_gb": trial.suggest_categorical(f"ram_gb_cpu{cpu}", valid_ram),
         "disk_type": trial.suggest_categorical("disk_type", space["disk_type"]),
         "disk_size_gb": trial.suggest_categorical(
             "disk_size_gb", space["disk_size_gb"]

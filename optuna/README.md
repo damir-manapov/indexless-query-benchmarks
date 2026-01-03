@@ -42,6 +42,14 @@ uv run python minio-optimizer/optimizer.py --cloud selectel --show-results
 - **Selectel** - OpenStack-based, ru-7 region
 - **Timeweb** - TWC API, ru-1 location
 
+## Pricing
+
+Cloud pricing is centralized in `pricing.py`:
+
+- CPU/RAM/disk costs per cloud
+- `cost_efficiency` metric (performance per ₽/mo)
+- Cloud constraints (min RAM per CPU)
+
 ## Check
 
 ```bash
