@@ -49,10 +49,10 @@ from pricing import get_cloud_pricing, CloudPricing
 pricing = get_cloud_pricing("selectel")
 ```
 
-| Cloud    | CPU (₽/vCPU/mo) | RAM (₽/GB/mo) | Disk (₽/GB/mo)                   |
-| -------- | --------------- | ------------- | -------------------------------- |
-| Selectel | 655             | 238           | fast: 11, universal: 9, basic: 7 |
-| Timeweb  | 220             | 180           | nvme: 5, ssd: 4, hdd: 2          |
+| Cloud    | CPU (₽/vCPU/mo) | RAM (₽/GB/mo) | Disk (₽/GB/mo)                                                |
+| -------- | --------------- | ------------- | ------------------------------------------------------------- |
+| Selectel | 655             | 238           | fast: 39, universal: 18, universal2: 9, basicssd: 9, basic: 7 |
+| Timeweb  | 220             | 180           | nvme: 5, ssd: 4, hdd: 2                                       |
 
 ### Cloud Constraints
 
@@ -167,7 +167,7 @@ def get_infra_search_space() -> dict:
     return {
         "cpu": [2, 4, 8, 16],
         "ram_gb": [4, 8, 16, 32],
-        "disk_type": ["basic", "fast", "universal"],
+        "disk_type": ["fast", "universal2", "universal", "basicssd", "basic"],
     }
 
 def get_config_search_space() -> dict:
