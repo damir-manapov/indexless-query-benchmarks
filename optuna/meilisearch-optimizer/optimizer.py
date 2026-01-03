@@ -796,6 +796,132 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
     print(f"Results exported to {output_path}")
 
 
+def load_historical_trials(
+    study: optuna.Study, cloud: str, mode: str, metric: str
+) -> int:
+    """Load historical results into Optuna study as completed trials.
+
+    This helps Optuna make better suggestions by learning from past results.
+    Returns the number of trials loaded.
+    """
+    rf = results_file()
+    if not rf.exists():
+        return 0
+
+    results = load_results(rf)
+    if not results:
+        return 0
+
+    # Filter results for this cloud that have valid QPS
+    valid_results = [
+        r
+        for r in results
+        if r.get("cloud") == cloud
+        and not r.get("error")
+        and r.get("qps", 0) > 0
+        and r.get("infra", {}).get("cpu")
+    ]
+
+    if not valid_results:
+        return 0
+
+    # Get search spaces for building distributions
+    infra_space = get_infra_search_space()
+    config_space = get_config_search_space()
+
+    loaded = 0
+    seen_configs = set()
+
+    for result in valid_results:
+        infra = result.get("infra", {})
+        config = result.get("config", {})
+
+        # Create a unique key to avoid duplicates
+        config_key = config_to_key(infra, config, cloud)
+        if config_key in seen_configs:
+            continue
+        seen_configs.add(config_key)
+
+        # Build params and distributions based on mode
+        params: dict = {}
+        distributions: dict = {}
+
+        cpu = infra.get("cpu")
+        ram = infra.get("ram_gb")
+        disk = infra.get("disk_type")
+
+        if mode in ("infra", "full"):
+            # Only include if values are in search space
+            if cpu not in infra_space["cpu"]:
+                continue
+            if disk not in infra_space["disk_type"]:
+                continue
+
+            # Check RAM is valid for this CPU
+            valid_ram = filter_valid_ram(cloud, cpu, infra_space["ram_gb"])
+            if ram not in valid_ram:
+                continue
+
+            params["cpu"] = cpu
+            params[f"ram_gb_cpu{cpu}"] = ram  # CPU-specific param name
+            params["disk_type"] = disk
+
+            distributions["cpu"] = optuna.distributions.CategoricalDistribution(
+                infra_space["cpu"]
+            )
+            distributions[
+                f"ram_gb_cpu{cpu}"
+            ] = optuna.distributions.CategoricalDistribution(valid_ram)
+            distributions[
+                "disk_type"
+            ] = optuna.distributions.CategoricalDistribution(infra_space["disk_type"])
+
+        if mode == "config":
+            # Config optimization on fixed infra - include config params
+            mem = config.get("max_indexing_memory_mb", 0)
+            threads = config.get("max_indexing_threads", 0)
+
+            if mem not in config_space["max_indexing_memory_mb"]:
+                continue
+            if threads not in config_space["max_indexing_threads"]:
+                continue
+
+            params["max_indexing_memory_mb"] = mem
+            params["max_indexing_threads"] = threads
+
+            distributions[
+                "max_indexing_memory_mb"
+            ] = optuna.distributions.CategoricalDistribution(
+                config_space["max_indexing_memory_mb"]
+            )
+            distributions[
+                "max_indexing_threads"
+            ] = optuna.distributions.CategoricalDistribution(
+                config_space["max_indexing_threads"]
+            )
+
+        if not params:
+            continue
+
+        # Calculate metric value
+        value = get_metric_value(result, metric, cloud)
+
+        # Create and add trial
+        try:
+            trial = optuna.trial.create_trial(
+                params=params,
+                distributions=distributions,
+                values=[value],
+            )
+            study.add_trial(trial)
+            loaded += 1
+        except Exception as e:
+            print(f"  Warning: Could not add historical trial: {e}")
+            continue
+
+    return loaded
+
+
 def objective_infra(
     trial: optuna.Trial,
     cloud: str,
@@ -1060,6 +1186,11 @@ def main():
                 sampler=TPESampler(seed=42),
             )
 
+            # Pre-load historical results so Optuna can learn from them
+            n_loaded = load_historical_trials(study, args.cloud, "infra", args.metric)
+            if n_loaded:
+                print(f"Loaded {n_loaded} historical trials into Optuna")
+
             study.optimize(
                 lambda trial: objective_infra(
                     trial, args.cloud, cloud_config, args.metric
@@ -1087,6 +1218,11 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
+
+            # Pre-load historical results so Optuna can learn from them
+            n_loaded = load_historical_trials(study, args.cloud, "config", args.metric)
+            if n_loaded:
+                print(f"Loaded {n_loaded} historical trials into Optuna")
 
             study.optimize(
                 lambda trial: objective_config(
@@ -1116,6 +1252,11 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
+
+            # Pre-load historical results so Optuna can learn from them
+            n_loaded = load_historical_trials(study_infra, args.cloud, "infra", args.metric)
+            if n_loaded:
+                print(f"Loaded {n_loaded} historical trials into Optuna")
 
             study_infra.optimize(
                 lambda trial: objective_infra(
@@ -1153,6 +1294,11 @@ def main():
                 direction=direction,
                 sampler=TPESampler(seed=42),
             )
+
+            # Pre-load historical results so Optuna can learn from them
+            n_loaded = load_historical_trials(study_config, args.cloud, "config", args.metric)
+            if n_loaded:
+                print(f"Loaded {n_loaded} historical trials into Optuna")
 
             study_config.optimize(
                 lambda trial: objective_config(
