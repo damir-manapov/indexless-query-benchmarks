@@ -16,7 +16,7 @@ optuna/
 
 ## Required Components
 
-### 1. Cloud Configuration
+### Cloud Configuration
 
 ```python
 @dataclass
@@ -29,7 +29,38 @@ def get_cloud_config(cloud: str) -> CloudConfig:
     return CloudConfig(name=cloud.upper(), terraform_dir=base / cloud)
 ```
 
-### 2. Benchmark Result Dataclass
+### Trial Timings Dataclass
+
+Track timing for each phase of a trial for analysis and debugging:
+
+```python
+@dataclass
+class TrialTimings:
+    """Timing measurements for each phase of a trial."""
+
+    terraform_s: float = 0.0      # Terraform apply
+    vm_ready_s: float = 0.0       # Wait for VM cloud-init
+    service_ready_s: float = 0.0  # Wait for service to start
+    data_load_s: float = 0.0      # Load test data (indexing, pgbench init, etc.)
+    benchmark_s: float = 0.0      # Run benchmark
+    trial_total_s: float = 0.0    # End-to-end trial time
+```
+
+Timings are populated in the objective function and stored with results:
+
+```python
+timings = TrialTimings()
+infra_start = time.time()
+benchmark_ip, service_ip = ensure_infra(cloud_config, infra_config)
+timings.terraform_s = time.time() - infra_start
+
+# ... run benchmark ...
+
+timings.trial_total_s = time.time() - trial_start
+result.timings = timings
+```
+
+### Benchmark Result Dataclass
 
 ```python
 @dataclass
@@ -46,11 +77,14 @@ class BenchmarkResult:
     # Error handling
     error: str | None = None
 
+    # Timing data (required)
+    timings: TrialTimings | None = None
+
     def is_valid(self) -> bool:
         return self.error is None and self.throughput > 0
 ```
 
-### 3. Search Spaces
+### Search Spaces
 
 Define separate functions for infrastructure and configuration parameters:
 
@@ -72,7 +106,7 @@ def get_config_search_space() -> dict:
     }
 ```
 
-### 4. Caching Functions
+### Caching Functions
 
 **Required for all optimizers** to avoid re-running expensive benchmarks:
 
@@ -108,6 +142,17 @@ def save_result(cloud: str, infra: dict, config: dict,
     """Save benchmark result to cache."""
     path = results_file()
     results = load_results(path)
+
+    # Convert timings to dict for JSON serialization
+    timings_dict = None
+    if result.timings:
+        timings_dict = {
+            "terraform_s": result.timings.terraform_s,
+            "vm_ready_s": result.timings.vm_ready_s,
+            "benchmark_s": result.timings.benchmark_s,
+            "trial_total_s": result.timings.trial_total_s,
+        }
+
     results.append({
         "trial": trial_num,
         "timestamp": datetime.now().isoformat(),
@@ -119,6 +164,7 @@ def save_result(cloud: str, infra: dict, config: dict,
             "latency_p95_ms": result.latency_p95_ms,
             # ... all metrics
         },
+        "timings": timings_dict,  # Store timing data for analysis
     })
     save_results(results, path)
 
@@ -126,7 +172,7 @@ def save_result(cloud: str, infra: dict, config: dict,
     export_results_md(cloud)
 ```
 
-### 5. Infrastructure Management
+### Infrastructure Management
 
 ```python
 def ensure_infra(cloud_config: CloudConfig, infra_config: dict) -> tuple[str, str]:
@@ -150,7 +196,7 @@ def ensure_infra(cloud_config: CloudConfig, infra_config: dict) -> tuple[str, st
     return get_tf_output(tf, "benchmark_vm_ip"), get_tf_output(tf, "service_ip")
 ```
 
-### 6. Benchmark Execution
+### Benchmark Execution
 
 ```python
 def run_benchmark(benchmark_ip: str, service_ip: str,
@@ -172,7 +218,7 @@ def run_benchmark(benchmark_ip: str, service_ip: str,
     return parse_benchmark_output(output)
 ```
 
-### 7. Result Parsing (for k6)
+### Result Parsing (for k6)
 
 Use `raw_decode` to handle extra data after JSON:
 
@@ -198,7 +244,7 @@ def parse_k6_results(results_json: str) -> BenchmarkResult:
         return BenchmarkResult(error=f"Failed to parse results: {e}")
 ```
 
-### 8. Optuna Objective Function
+### Optuna Objective Function
 
 ```python
 def objective(trial: optuna.Trial, cloud_config: CloudConfig,
@@ -244,7 +290,7 @@ def objective(trial: optuna.Trial, cloud_config: CloudConfig,
     return get_metric_value(result, metric)
 ```
 
-### 9. Main Function
+### Main Function
 
 ```python
 def main():
@@ -298,7 +344,7 @@ def main():
             destroy_all(cloud_config.terraform_dir, cloud_config.name)
 ```
 
-### 10. Results Display and Export
+### Results Display and Export
 
 All optimizers should provide console display and markdown export:
 
@@ -360,11 +406,11 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
 
 ## Common Pitfalls
 
-### 1. JSON Parsing
+### JSON Parsing
 
 Always use `json.JSONDecoder().raw_decode()` for k6 output - it may have extra data after the JSON.
 
-### 2. SSH Timeouts
+### SSH Timeouts
 
 Long-running benchmarks need increased timeouts:
 
@@ -372,7 +418,7 @@ Long-running benchmarks need increased timeouts:
 run_ssh_command(vm_ip, cmd, timeout=600)  # 10 minutes for benchmarks
 ```
 
-### 3. Stale Terraform State
+### Stale Terraform State
 
 VMs may be deleted externally. Always validate before reusing:
 
@@ -381,7 +427,7 @@ if current_ip and validate_vm_exists(current_ip):
     # VM exists, can reuse
 ```
 
-### 4. Pruned Trials
+### Pruned Trials
 
 Infrastructure failures should prune the trial, not crash:
 

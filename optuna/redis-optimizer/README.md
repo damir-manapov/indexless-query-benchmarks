@@ -80,6 +80,14 @@ uv run python redis-optimizer/optimizer.py --cloud selectel --trials 5
 | p99_latency_ms  | Minimize  | 99th percentile latency in ms |
 | cost_efficiency | Maximize  | ops/sec per $/hr              |
 
+### Trial Timings
+
+Each trial records phase timings in `results.json`:
+
+- `redis_deploy_s` - Redis cluster deployment time
+- `benchmark_s` - memtier_benchmark execution time
+- `trial_total_s` - Total trial duration
+
 ## Benchmark Workload
 
 Uses `memtier_benchmark` with:

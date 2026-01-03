@@ -68,7 +68,8 @@ def wait_for_vm_ready(
                 vm_ip, "test -f /root/cloud-init-ready", timeout=15, jump_host=jump_host
             )
             if code == 0:
-                print("  VM is ready!")
+                elapsed = int(time.time() - start)
+                print(f"  VM is ready! ({elapsed}s)")
                 return True
 
             elapsed = int(time.time() - start)

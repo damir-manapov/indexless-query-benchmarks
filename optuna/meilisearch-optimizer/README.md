@@ -38,8 +38,8 @@ uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode config 
 # Full optimization
 uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode full --trials 15
 
-# Optimize for QPS instead of p95 latency
-uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode config --metric qps --trials 10
+# Optimize for p95 latency instead of QPS (default)
+uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode config --metric p95_ms --trials 10
 
 # Keep infrastructure after optimization
 uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode config --trials 5 --no-destroy
@@ -67,11 +67,22 @@ uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode infra -
 
 ## Metrics
 
-| Metric        | Direction | Description             |
-| ------------- | --------- | ----------------------- |
-| p95_ms        | Minimize  | 95th percentile latency |
-| qps           | Maximize  | Queries per second      |
-| indexing_time | Minimize  | Time to index 500K docs |
+| Metric        | Direction | Default | Description             |
+| ------------- | --------- | ------- | ----------------------- |
+| qps           | Maximize  | ✓       | Queries per second      |
+| p95_ms        | Minimize  |         | 95th percentile latency |
+| indexing_time | Minimize  |         | Time to index 500K docs |
+
+Use `--metric p95_ms` or `--metric indexing_time` to optimize for different goals.
+
+### Trial Timings
+
+Each trial records phase timings in `results.json`:
+
+- `terraform_s` - Infrastructure provisioning time
+- `indexing_s` - Dataset indexing time  
+- `benchmark_s` - k6 benchmark execution time
+- `trial_total_s` - Total trial duration
 
 ## Query Patterns
 

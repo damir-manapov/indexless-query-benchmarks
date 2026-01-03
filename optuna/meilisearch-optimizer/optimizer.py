@@ -83,6 +83,19 @@ def get_config_search_space():
 
 
 @dataclass
+class TrialTimings:
+    """Timing measurements for each phase of a trial."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
+    meili_ready_s: float = 0.0  # Wait for Meilisearch service
+    dataset_gen_s: float = 0.0  # Generate products
+    indexing_s: float = 0.0  # Upload and index
+    benchmark_s: float = 0.0  # k6 benchmark
+    trial_total_s: float = 0.0  # End-to-end trial time
+
+
+@dataclass
 class BenchmarkResult:
     """Benchmark results."""
 
@@ -93,6 +106,7 @@ class BenchmarkResult:
     error_rate: float = 0.0
     indexing_time_s: float = 0.0
     error: str | None = None
+    timings: TrialTimings | None = None
 
 
 def wait_for_meilisearch_ready(
@@ -126,6 +140,7 @@ def upload_and_index_dataset(
 ) -> float:
     """Generate, upload and index the dataset. Returns indexing time in seconds."""
     print(f"  Generating and indexing {DATASET_SIZE:,} products...")
+    gen_start = time.time()
 
     # Generate dataset on benchmark VM using Node.js
     gen_cmd = f"""
@@ -179,6 +194,8 @@ JSEOF
     if code != 0:
         print(f"  Failed to generate dataset: {output}")
         return -1
+    gen_elapsed = int(time.time() - gen_start)
+    print(f"  Generated {DATASET_SIZE:,} products in {gen_elapsed}s")
 
     # Create index with settings
     create_cmd = f"""
@@ -287,7 +304,7 @@ k6 run /tmp/benchmark.js \\
 
     # Parse results
     cat_cmd = "cat /tmp/k6_results.json"
-    code, results_json = run_ssh_command(benchmark_ip, cat_cmd, timeout=10)
+    code, results_json = run_ssh_command(benchmark_ip, cat_cmd, timeout=60)
 
     if code != 0:
         return BenchmarkResult(error="Failed to get k6 results")
@@ -356,6 +373,7 @@ def ensure_infra(
             pass
 
     print("  Creating infrastructure...")
+    tf_start = time.time()
     tf_vars = {
         "meilisearch_enabled": True,
         "postgres_enabled": False,
@@ -373,9 +391,12 @@ def ensure_infra(
         )
 
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
+    tf_elapsed = int(time.time() - tf_start)
 
     if ret_code != 0:
         raise RuntimeError(f"Failed to create infrastructure: {stderr}")
+
+    print(f"  Infrastructure created in {tf_elapsed}s")
 
     meili_ip = get_tf_output(tf, "meilisearch_vm_ip")
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
@@ -491,6 +512,18 @@ def save_result(
     rf = results_file()
     results = load_results(rf)
 
+    timings_dict = None
+    if result.timings:
+        timings_dict = {
+            "terraform_s": result.timings.terraform_s,
+            "vm_ready_s": result.timings.vm_ready_s,
+            "meili_ready_s": result.timings.meili_ready_s,
+            "dataset_gen_s": result.timings.dataset_gen_s,
+            "indexing_s": result.timings.indexing_s,
+            "benchmark_s": result.timings.benchmark_s,
+            "trial_total_s": result.timings.trial_total_s,
+        }
+
     results.append(
         {
             "trial": trial_num,
@@ -505,6 +538,7 @@ def save_result(
             "error_rate": result.error_rate,
             "indexing_time_s": indexing_time,
             "error": result.error,
+            "timings": timings_dict,
         }
     )
 
@@ -690,13 +724,17 @@ def objective_infra(
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [infra]: {infra_config}")
     print(f"{'=' * 60}")
+    trial_start = time.time()
+    timings = TrialTimings()
 
     # Check cache
     cached = find_cached_result(infra_config, {}, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
-        print(f"  Using cached result: {cached_value:.2f} ({metric})")
-        return cached_value
+        print(f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate")
+        trial.set_user_attr("cached", True)
+        trial.set_user_attr("cached_value", cached_value)
+        raise optuna.TrialPruned(f"Duplicate config, cached value: {cached_value:.2f}")
 
     # Destroy and recreate
     print("  Destroying previous VM...")
@@ -704,25 +742,42 @@ def objective_infra(
     time.sleep(5)
 
     try:
+        infra_start = time.time()
         benchmark_ip, meili_ip = ensure_infra(cloud_config, infra_config)
+        timings.terraform_s = time.time() - infra_start
     except Exception as e:
         print(f"  Failed to create infrastructure: {e}")
         raise optuna.TrialPruned("Infrastructure creation failed")
 
     # Index dataset
+    index_start = time.time()
     indexing_time = upload_and_index_dataset(benchmark_ip, meili_ip)
+    timings.indexing_s = time.time() - index_start
     if indexing_time < 0:
         raise optuna.TrialPruned("Indexing failed")
 
     # Run benchmark
+    benchmark_start = time.time()
     vus = infra_config["cpu"] * 2
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
+    timings.benchmark_s = time.time() - benchmark_start
+
+    if result.error:
+        print(f"  Benchmark failed: {result.error}")
+        raise optuna.TrialPruned(result.error)
+
+    timings.trial_total_s = time.time() - trial_start
+    result.timings = timings
 
     if result.error:
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
 
     print(f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms")
+    print(
+        f"  Timings: infra={timings.terraform_s:.0f}s, index={timings.indexing_s:.0f}s, "
+        f"bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+    )
 
     save_result(
         result,
@@ -767,13 +822,17 @@ def objective_config(
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [config]: {config}")
     print(f"{'=' * 60}")
+    trial_start = time.time()
+    timings = TrialTimings()
 
     # Check cache
     cached = find_cached_result(infra_config, config, cloud)
     if cached:
         cached_value = get_metric_value(cached, metric)
-        print(f"  Using cached result: {cached_value:.2f} ({metric})")
-        return cached_value
+        print(f"  Using cached result: {cached_value:.2f} ({metric}) - pruning duplicate")
+        trial.set_user_attr("cached", True)
+        trial.set_user_attr("cached_value", cached_value)
+        raise optuna.TrialPruned(f"Duplicate config, cached value: {cached_value:.2f}")
 
     # Reconfigure and re-index
     if not reconfigure_meilisearch(meili_ip, config, jump_host=benchmark_ip):
@@ -788,20 +847,30 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
     run_ssh_command(benchmark_ip, delete_cmd, timeout=30)
     time.sleep(2)
 
+    index_start = time.time()
     indexing_time = upload_and_index_dataset(benchmark_ip, meili_ip)
+    timings.indexing_s = time.time() - index_start
     if indexing_time < 0:
         raise optuna.TrialPruned("Indexing failed")
 
     # Run benchmark
+    benchmark_start = time.time()
     vus = infra_config.get("cpu", 4) * 2
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
+    timings.benchmark_s = time.time() - benchmark_start
 
     if result.error:
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
 
+    timings.trial_total_s = time.time() - trial_start
+    result.timings = timings
+
     print(
         f"  Result: {result.qps:.1f} QPS, p95={result.p95_ms:.1f}ms, indexing={indexing_time:.1f}s"
+    )
+    print(
+        f"  Timings: index={timings.indexing_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     save_result(

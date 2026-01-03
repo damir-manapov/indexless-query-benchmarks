@@ -75,7 +75,19 @@ METRICS = {
 
 
 @dataclass
-class PgBenchResult:
+class TrialTimings:
+    """Timing measurements for each phase of a trial."""
+
+    terraform_s: float = 0.0  # Terraform apply
+    vm_ready_s: float = 0.0  # Wait for VM cloud-init
+    pg_ready_s: float = 0.0  # Wait for Postgres service
+    pgbench_init_s: float = 0.0  # Initialize pgbench tables
+    benchmark_s: float = 0.0  # pgbench run
+    trial_total_s: float = 0.0  # End-to-end trial time
+
+
+@dataclass
+class BenchmarkResult:
     """pgbench benchmark results."""
 
     tps: float = 0.0
@@ -84,19 +96,10 @@ class PgBenchResult:
     transactions: int = 0
     duration_s: float = 0.0
     error: str | None = None
-
-
-@dataclass
-class BenchmarkResult:
-    """Full benchmark result with config."""
-
-    infra_config: dict
-    pg_config: dict
-    tps: float = 0.0
-    latency_avg_ms: float = 0.0
-    latency_stddev_ms: float = 0.0
-    duration_s: float = 0.0
-    error: str | None = None
+    timings: TrialTimings | None = None
+    pgbench_init_s: float = 0.0  # Initialize pgbench tables
+    benchmark_s: float = 0.0  # pgbench run
+    trial_total_s: float = 0.0  # End-to-end trial time
 
 
 def results_file() -> Path:
@@ -299,6 +302,7 @@ def ensure_infra(
             pass
 
     print("  Creating infrastructure...")
+    tf_start = time.time()
     tf_vars = {
         "postgres_enabled": True,
         "postgres_mode": mode,
@@ -317,9 +321,12 @@ def ensure_infra(
         )
 
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
+    tf_elapsed = int(time.time() - tf_start)
 
     if ret_code != 0:
         raise RuntimeError(f"Failed to create infrastructure: {stderr}")
+
+    print(f"  Infrastructure created in {tf_elapsed}s")
 
     postgres_ip = get_tf_output(tf, "postgres_vm_ip")
     benchmark_ip = get_tf_output(tf, "benchmark_vm_ip")
@@ -427,7 +434,7 @@ def run_pgbench(
     clients: int = 16,
     threads: int = 4,
     duration: int = 60,
-) -> PgBenchResult:
+) -> BenchmarkResult:
     """Run pgbench from benchmark VM against Postgres VM."""
     print(
         f"  Running pgbench (clients={clients}, duration={duration}s) from benchmark VM..."
@@ -449,19 +456,19 @@ def run_pgbench(
     try:
         code, output = run_ssh_command(benchmark_ip, bench_cmd, timeout=duration + 60)
     except Exception as e:
-        return PgBenchResult(error=str(e))
+        return BenchmarkResult(error=str(e))
 
     elapsed = time.time() - start_time
 
     if code != 0:
-        return PgBenchResult(error=output[:500])
+        return BenchmarkResult(error=output[:500])
 
     return parse_pgbench_output(output, elapsed)
 
 
-def parse_pgbench_output(output: str, duration: float) -> PgBenchResult:
+def parse_pgbench_output(output: str, duration: float) -> BenchmarkResult:
     """Parse pgbench output."""
-    result = PgBenchResult(duration_s=duration)
+    result = BenchmarkResult(duration_s=duration)
 
     # Parse TPS: tps = 1234.567890 (without initial connection time)
     tps_match = re.search(r"tps = ([\d.]+) \(without initial connection time\)", output)
@@ -504,7 +511,7 @@ def calculate_cost(infra_config: dict, cloud_config: CloudConfig) -> float:
 
 
 def save_result(
-    result: PgBenchResult,
+    result: BenchmarkResult,
     infra_config: dict,
     pg_config: dict,
     trial_number: int,
@@ -517,6 +524,17 @@ def save_result(
 
     cost = calculate_cost(infra_config, cloud_config)
     cost_efficiency = result.tps / cost if cost > 0 else 0
+
+    timings_dict = None
+    if result.timings:
+        timings_dict = {
+            "terraform_s": result.timings.terraform_s,
+            "vm_ready_s": result.timings.vm_ready_s,
+            "pg_ready_s": result.timings.pg_ready_s,
+            "pgbench_init_s": result.timings.pgbench_init_s,
+            "benchmark_s": result.timings.benchmark_s,
+            "trial_total_s": result.timings.trial_total_s,
+        }
 
     results.append(
         {
@@ -534,6 +552,7 @@ def save_result(
             "transactions": result.transactions,
             "duration_s": result.duration_s,
             "error": result.error,
+            "timings": timings_dict,
         }
     )
 
@@ -742,6 +761,8 @@ def objective_infra(
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [infra]: {infra_config}")
     print(f"{'=' * 60}")
+    trial_start = time.time()
+    timings = TrialTimings()
 
     # Check cache
     cached = find_cached_result(infra_config, pg_config, cloud)
@@ -757,7 +778,9 @@ def objective_infra(
 
     # Create VMs
     try:
+        infra_start = time.time()
         benchmark_ip, postgres_ip = ensure_infra(cloud_config, infra_config)
+        timings.terraform_s = time.time() - infra_start
     except Exception as e:
         print(f"  Failed to create infrastructure: {e}")
         raise optuna.TrialPruned("Infrastructure creation failed")
@@ -770,20 +793,31 @@ def objective_infra(
         raise optuna.TrialPruned("Postgres config failed")
 
     # Initialize pgbench (scale based on RAM)
+    init_start = time.time()
     scale = max(50, ram_gb * 10)
     if not initialize_pgbench(postgres_ip, scale=scale, jump_host=benchmark_ip):
         raise optuna.TrialPruned("pgbench init failed")
+    timings.pgbench_init_s = time.time() - init_start
 
     # Run benchmark
+    bench_start = time.time()
     result = run_pgbench(
         benchmark_ip, postgres_ip, clients=infra_config["cpu"] * 4, duration=60
     )
+    timings.benchmark_s = time.time() - bench_start
 
     if result.error:
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
 
+    timings.trial_total_s = time.time() - trial_start
+    result.timings = timings
+
     print(f"  Result: {result.tps:.1f} TPS, {result.latency_avg_ms:.2f}ms latency")
+    print(
+        f"  Timings: infra={timings.terraform_s:.0f}s, init={timings.pgbench_init_s:.0f}s, "
+        f"bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
+    )
 
     # Save result
     save_result(
@@ -853,6 +887,8 @@ def objective_config(
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [config]: {pg_summary(pg_config)}")
     print(f"{'=' * 60}")
+    trial_start = time.time()
+    timings = TrialTimings()
 
     # Check cache
     cached = find_cached_result(infra_config, pg_config, cloud)
@@ -869,15 +905,21 @@ def objective_config(
         raise optuna.TrialPruned("Postgres config failed")
 
     # Run benchmark
+    bench_start = time.time()
     result = run_pgbench(
         benchmark_ip, postgres_ip, clients=infra_config["cpu"] * 4, duration=60
     )
+    timings.benchmark_s = time.time() - bench_start
 
     if result.error:
         print(f"  Benchmark failed: {result.error}")
         raise optuna.TrialPruned(result.error)
 
+    timings.trial_total_s = time.time() - trial_start
+    result.timings = timings
+
     print(f"  Result: {result.tps:.1f} TPS, {result.latency_avg_ms:.2f}ms latency")
+    print(f"  Timings: bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s")
 
     # Save result
     save_result(

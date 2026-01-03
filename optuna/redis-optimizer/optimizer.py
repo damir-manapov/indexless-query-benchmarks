@@ -220,6 +220,15 @@ class MemtierResult:
 
 
 @dataclass
+class TrialTimings:
+    """Timing measurements for each phase of a trial."""
+
+    redis_deploy_s: float = 0.0  # Terraform + wait for Redis
+    benchmark_s: float = 0.0  # memtier benchmark
+    trial_total_s: float = 0.0  # End-to-end trial time
+
+
+@dataclass
 class BenchmarkResult:
     config: dict
     ops_per_sec: float = 0.0
@@ -230,6 +239,7 @@ class BenchmarkResult:
     kb_per_sec: float = 0.0
     duration_s: float = 0.0
     error: str | None = None
+    timings: TrialTimings | None = None
 
 
 def config_to_key(config: dict, cloud: str) -> str:
@@ -485,6 +495,14 @@ def save_result(
     cost = calculate_cost(config, cloud_config)
     cost_efficiency = result.ops_per_sec / cost if cost > 0 else 0
 
+    timings_dict = None
+    if result.timings:
+        timings_dict = {
+            "redis_deploy_s": result.timings.redis_deploy_s,
+            "benchmark_s": result.timings.benchmark_s,
+            "trial_total_s": result.timings.trial_total_s,
+        }
+
     results.append(
         {
             "trial": trial_number,
@@ -502,6 +520,7 @@ def save_result(
             "kb_per_sec": result.kb_per_sec,
             "duration_s": result.duration_s,
             "error": result.error,
+            "timings": timings_dict,
         }
     )
 
@@ -552,6 +571,7 @@ def objective(
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [{cloud}]: {config}")
     print(f"{'=' * 60}")
+    trial_start = time.time()
 
     # Check cache
     cached = find_cached_result(config, cloud)
@@ -560,6 +580,8 @@ def objective(
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
+    timings = TrialTimings()
+
     # Destroy any existing Redis
     print("  Cleaning up previous Redis deployment...")
     destroy_redis(cloud_config)
@@ -567,18 +589,23 @@ def objective(
 
     # Deploy Redis
     success, deploy_time = deploy_redis(config, cloud_config, vm_ip)
+    timings.redis_deploy_s = deploy_time
     if not success:
         print("  Deploy failed - marking trial as pruned (will retry config later)")
         raise optuna.TrialPruned("Deploy failed")
 
     # Run benchmark
+    bench_start = time.time()
     result = run_memtier_benchmark(vm_ip)
+    timings.benchmark_s = time.time() - bench_start
 
     if result is None or result.ops_per_sec == 0:
         print("  Benchmark failed - marking trial as pruned (will retry config later)")
         raise optuna.TrialPruned("Benchmark failed")
 
+    timings.trial_total_s = time.time() - trial_start
     result.config = config
+    result.timings = timings
     save_result(result, config, trial.number, cloud, cloud_config)
 
     cost = calculate_cost(config, cloud_config)
@@ -592,6 +619,9 @@ def objective(
 
     print(
         f"  Result: {result.ops_per_sec:.0f} ops/s, p99={result.p99_latency_ms:.2f}ms, Cost: {cost:.2f}/hr"
+    )
+    print(
+        f"  Timings: deploy={timings.redis_deploy_s:.0f}s, bench={timings.benchmark_s:.0f}s, total={timings.trial_total_s:.0f}s"
     )
 
     return metric_value

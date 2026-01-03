@@ -109,6 +109,15 @@ uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode config --tr
 | latency_avg_ms  | Minimize  | Average latency in ms   |
 | cost_efficiency | Maximize  | TPS per $/hr            |
 
+### Trial Timings
+
+Each trial records phase timings in `results.json`:
+
+- `terraform_s` - Infrastructure provisioning time
+- `pgbench_init_s` - pgbench initialization time
+- `benchmark_s` - Benchmark execution time
+- `trial_total_s` - Total trial duration
+
 ## Benchmark Workload
 
 Uses `pgbench` with:
