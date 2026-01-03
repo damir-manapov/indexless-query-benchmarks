@@ -611,10 +611,13 @@ def config_summary(r: dict) -> str:
     infra = r.get("infra", {})
     cfg = r.get("config", {})
     infra_str = f"{infra.get('cpu', 0)}cpu/{infra.get('ram_gb', 0)}gb/{infra.get('disk_type', '?')}"
-    if cfg:
-        cfg_str = f" mem={cfg.get('max_indexing_memory_mb', 0)}mb thr={cfg.get('max_indexing_threads', 0)}"
-        return infra_str + cfg_str
-    return infra_str
+    # Always show config (0 = auto)
+    mem = cfg.get('max_indexing_memory_mb', 0)
+    thr = cfg.get('max_indexing_threads', 0)
+    mem_str = 'auto' if mem == 0 else f'{mem}mb'
+    thr_str = 'auto' if thr == 0 else str(thr)
+    cfg_str = f" mem={mem_str} thr={thr_str}"
+    return infra_str + cfg_str
 
 
 def format_results(cloud: str) -> dict | None:
@@ -706,8 +709,11 @@ def show_results(cloud: str) -> None:
     print("-" * 120)
 
     for i, r in enumerate(data["rows"], 1):
+        # Show 'auto' for default Meilisearch config (0 = auto)
+        mem_str = 'auto' if r['mem_mb'] == 0 else str(r['mem_mb'])
+        thr_str = 'auto' if r['threads'] == 0 else str(r['threads'])
         print(
-            f"{i:>3} {r['cpu']:>4} {r['ram']:>4} {r['disk']:<9} {r['mem_mb']:>7} {r['threads']:>4} "
+            f"{i:>3} {r['cpu']:>4} {r['ram']:>4} {r['disk']:<9} {mem_str:>7} {thr_str:>4} "
             f"{r['qps']:>8.1f} {r['p50']:>7.1f} {r['p95']:>7.1f} {r['p99']:>7.1f} {r['idx_time']:>8.1f} "
             f"{r['cost']:>7.0f} {r['eff']:>7.2f}"
         )
@@ -753,8 +759,11 @@ def export_results_md(cloud: str, output_path: Path | None = None) -> None:
     ]
 
     for i, r in enumerate(data["rows"], 1):
+        # Show 'auto' for default Meilisearch config (0 = auto)
+        mem_str = 'auto' if r['mem_mb'] == 0 else str(r['mem_mb'])
+        thr_str = 'auto' if r['threads'] == 0 else str(r['threads'])
         lines.append(
-            f"| {i} | {r['cpu']} | {r['ram']} | {r['disk']} | {r['mem_mb']} | {r['threads']} | "
+            f"| {i} | {r['cpu']} | {r['ram']} | {r['disk']} | {mem_str} | {thr_str} | "
             f"{r['qps']:.1f} | {r['p50']:.1f} | {r['p95']:.1f} | {r['p99']:.1f} | {r['idx_time']:.1f} | "
             f"{r['cost']:.0f} | {r['eff']:.2f} |"
         )
