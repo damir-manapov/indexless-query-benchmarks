@@ -773,7 +773,7 @@ Examples:
             else:
                 print(f"Best {args.metric}: N/A")
 
-            best_cost = calculate_cost(best.params, cloud)
+            best_cost = calculate_cost(best.params, args.cloud)
             print(f"Best config cost: {best_cost:.2f}/hr")
         except ValueError:
             print("No successful trials completed")

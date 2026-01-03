@@ -1164,7 +1164,7 @@ Examples:
             print(f"Best {args.metric}: {best.value:.2f}")
 
             # Calculate cost for best config
-            best_cost = calculate_cost(best.params, cloud_config)
+            best_cost = calculate_cost(best.params, args.cloud)
             print(f"Best config cost: {best_cost:.2f}/hr")
         except ValueError:
             print("No successful trials completed")

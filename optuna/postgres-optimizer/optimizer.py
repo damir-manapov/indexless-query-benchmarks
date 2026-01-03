@@ -503,10 +503,12 @@ def calculate_cost(infra_config: dict, cloud: str) -> float:
         cloud=cloud,
         cpu=infra_config.get("cpu", 4),
         ram_gb=infra_config.get("ram_gb", 16),
-        disks=[DiskConfig(
-            size_gb=infra_config.get("disk_size_gb", 100),
-            disk_type=infra_config.get("disk_type", "fast"),
-        )],
+        disks=[
+            DiskConfig(
+                size_gb=infra_config.get("disk_size_gb", 100),
+                disk_type=infra_config.get("disk_type", "fast"),
+            )
+        ],
     )
 
 
