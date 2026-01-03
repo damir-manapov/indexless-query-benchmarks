@@ -923,5 +923,86 @@
       "benchmark_s": 64.84870147705078,
       "trial_total_s": 97.01442217826843
     }
+  },
+  {
+    "trial": 0,
+    "timestamp": "2026-01-03T23:54:24.851203",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 16,
+      "disk_type": "universal2"
+    },
+    "config": {},
+    "qps": 3122.015596168142,
+    "p50_ms": 30,
+    "p95_ms": 36,
+    "p99_ms": 39,
+    "error_rate": 0.0,
+    "indexing_time_s": 16.05377173423767,
+    "error": null,
+    "timings": {
+      "terraform_s": 232.73344373703003,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 25.247323274612427,
+      "benchmark_s": 64.55422496795654,
+      "trial_total_s": 327.8412342071533
+    }
+  },
+  {
+    "trial": 4,
+    "timestamp": "2026-01-04T00:01:53.883272",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 8,
+      "disk_type": "basicssd"
+    },
+    "config": {},
+    "qps": 2607.1808772126733,
+    "p50_ms": 39,
+    "p95_ms": 47,
+    "p99_ms": 51,
+    "error_rate": 0.0,
+    "indexing_time_s": 16.239327907562256,
+    "error": null,
+    "timings": {
+      "terraform_s": 164.51312685012817,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 25.50330924987793,
+      "benchmark_s": 64.57618713378906,
+      "trial_total_s": 316.160040140152
+    }
+  },
+  {
+    "trial": 7,
+    "timestamp": "2026-01-04T00:07:28.390744",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 8,
+      "ram_gb": 64,
+      "disk_type": "universal2"
+    },
+    "config": {},
+    "qps": 4509.07262249533,
+    "p50_ms": 18,
+    "p95_ms": 22,
+    "p99_ms": 24,
+    "error_rate": 0.0,
+    "indexing_time_s": 13.927561521530151,
+    "error": null,
+    "timings": {
+      "terraform_s": 176.84323239326477,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 23.15819787979126,
+      "benchmark_s": 64.47812604904175,
+      "trial_total_s": 334.42328333854675
+    }
   }
 ]

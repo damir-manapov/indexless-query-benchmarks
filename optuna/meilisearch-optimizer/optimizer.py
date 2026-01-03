@@ -543,10 +543,18 @@ def find_cached_result(infra: dict, meili_config: dict, cloud: str) -> dict | No
     return None
 
 
-def get_metric_value(result: dict, metric: str) -> float:
-    """Extract the optimization metric value from a result."""
+def get_metric_value(result: dict, metric: str, cloud: str = "selectel") -> float:
+    """Extract the optimization metric value from a result.
+
+    For cost_efficiency, calculates QPS/cost on-the-fly from infra config.
+    """
     if metric == "qps":
         return result.get("qps", 0)
+    elif metric == "cost_efficiency":
+        qps = result.get("qps", 0)
+        infra = result.get("infra", {})
+        cost = calculate_cost(infra, cloud)
+        return qps / cost if cost > 0 else 0
     elif metric == "indexing_time":
         return result.get("indexing_time_s", float("inf"))
     else:  # p95_ms default
@@ -818,7 +826,7 @@ def objective_infra(
     # Check cache - return cached value so Optuna learns from it
     cached = find_cached_result(infra_config, {}, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric)
+        cached_value = get_metric_value(cached, metric, cloud)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
@@ -922,7 +930,7 @@ def objective_config(
     # Check cache - return cached value so Optuna learns from it
     cached = find_cached_result(infra_config, config, cloud)
     if cached:
-        cached_value = get_metric_value(cached, metric)
+        cached_value = get_metric_value(cached, metric, cloud)
         print(f"  Using cached result: {cached_value:.2f} ({metric})")
         return cached_value
 
