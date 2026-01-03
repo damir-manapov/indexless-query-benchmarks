@@ -829,9 +829,9 @@ def objective_infra(
     if indexing_time < 0:
         raise optuna.TrialPruned("Indexing failed")
 
-    # Run benchmark
+    # Run benchmark with fixed VUs for fair comparison across configs
     benchmark_start = time.time()
-    vus = infra_config["cpu"] * 2
+    vus = 64  # Fixed VUs to saturate all configs equally
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
     timings.benchmark_s = time.time() - benchmark_start
 
@@ -930,9 +930,9 @@ curl -sf -X DELETE 'http://{meili_ip}:7700/indexes/products' \\
     if indexing_time < 0:
         raise optuna.TrialPruned("Indexing failed")
 
-    # Run benchmark
+    # Run benchmark with fixed VUs for fair comparison across configs
     benchmark_start = time.time()
-    vus = infra_config.get("cpu", 4) * 2
+    vus = 64  # Fixed VUs to saturate all configs equally
     result = run_k6_benchmark(benchmark_ip, meili_ip, vus=vus, duration=60)
     timings.benchmark_s = time.time() - benchmark_start
 
