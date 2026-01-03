@@ -1112,5 +1112,95 @@
       "benchmark_s": 64.47183203697205,
       "trial_total_s": 387.243367433548
     }
+  },
+  {
+    "trial": 12,
+    "timestamp": "2026-01-04T00:55:45.975309",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 4,
+      "disk_type": "universal2"
+    },
+    "config": {
+      "max_indexing_memory_mb": 512,
+      "max_indexing_threads": 4
+    },
+    "qps": 3244.872584151628,
+    "p50_ms": 29,
+    "p95_ms": 34,
+    "p99_ms": 39,
+    "error_rate": 0.0,
+    "indexing_time_s": 12.376528263092041,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 21.90263032913208,
+      "benchmark_s": 64.6230878829956,
+      "trial_total_s": 100.37895369529724
+    }
+  },
+  {
+    "trial": 14,
+    "timestamp": "2026-01-04T00:58:38.127177",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 4,
+      "disk_type": "universal2"
+    },
+    "config": {
+      "max_indexing_memory_mb": 2048,
+      "max_indexing_threads": 2
+    },
+    "qps": 2880.289471764396,
+    "p50_ms": 33,
+    "p95_ms": 44,
+    "p99_ms": 48,
+    "error_rate": 0.0,
+    "indexing_time_s": 16.275301694869995,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 25.611119508743286,
+      "benchmark_s": 64.58785939216614,
+      "trial_total_s": 104.00769186019897
+    }
+  },
+  {
+    "trial": 15,
+    "timestamp": "2026-01-04T01:00:18.406157",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 4,
+      "disk_type": "universal2"
+    },
+    "config": {
+      "max_indexing_memory_mb": 2048,
+      "max_indexing_threads": 4
+    },
+    "qps": 2958.3191196386983,
+    "p50_ms": 32,
+    "p95_ms": 43,
+    "p99_ms": 47,
+    "error_rate": 0.0,
+    "indexing_time_s": 12.397979021072388,
+    "error": null,
+    "timings": {
+      "terraform_s": 0.0,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 21.80942702293396,
+      "benchmark_s": 64.52707409858704,
+      "trial_total_s": 100.25151705741882
+    }
   }
 ]

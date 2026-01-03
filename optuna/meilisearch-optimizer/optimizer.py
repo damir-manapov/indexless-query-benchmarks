@@ -56,6 +56,9 @@ METRICS = {
 # Meilisearch master key (must match terraform)
 MASTER_KEY = "benchmark-master-key-change-in-production"
 
+# Disk size (must match terraform/selectel/meilisearch.tf default)
+DISK_SIZE_GB = 100
+
 # Dataset config
 DATASET_SIZE = 500000  # 500K products
 
@@ -105,7 +108,7 @@ def calculate_cost(infra_config: dict, cloud: str) -> float:
         ram_gb=infra_config.get("ram_gb", 0),
         disks=[
             DiskConfig(
-                size_gb=50,
+                size_gb=DISK_SIZE_GB,
                 disk_type=infra_config.get("disk_type", "fast"),
             )
         ],
@@ -428,7 +431,7 @@ def ensure_infra(
 
     print("  Creating infrastructure...")
     tf_start = time.time()
-    tf_vars = {
+    tf_vars: dict[str, bool | int | str] = {
         "meilisearch_enabled": True,
         "postgres_enabled": False,
         "redis_enabled": False,
@@ -436,13 +439,10 @@ def ensure_infra(
     }
 
     if infra_config:
-        tf_vars.update(
-            {
-                "meilisearch_cpu": infra_config.get("cpu", 4),
-                "meilisearch_ram_gb": infra_config.get("ram_gb", 8),
-                "meilisearch_disk_type": infra_config.get("disk_type", "fast"),
-            }
-        )
+        tf_vars["meilisearch_cpu"] = infra_config.get("cpu", 4)
+        tf_vars["meilisearch_ram_gb"] = infra_config.get("ram_gb", 8)
+        tf_vars["meilisearch_disk_size_gb"] = DISK_SIZE_GB
+        tf_vars["meilisearch_disk_type"] = infra_config.get("disk_type", "fast")
 
     ret_code, stdout, stderr = tf.apply(skip_plan=True, var=tf_vars)
     tf_elapsed = int(time.time() - tf_start)
@@ -869,12 +869,12 @@ def load_historical_trials(
             distributions["cpu"] = optuna.distributions.CategoricalDistribution(
                 infra_space["cpu"]
             )
-            distributions[
-                f"ram_gb_cpu{cpu}"
-            ] = optuna.distributions.CategoricalDistribution(valid_ram)
-            distributions[
-                "disk_type"
-            ] = optuna.distributions.CategoricalDistribution(infra_space["disk_type"])
+            distributions[f"ram_gb_cpu{cpu}"] = (
+                optuna.distributions.CategoricalDistribution(valid_ram)
+            )
+            distributions["disk_type"] = optuna.distributions.CategoricalDistribution(
+                infra_space["disk_type"]
+            )
 
         if mode == "config":
             # Config optimization on fixed infra - include config params
@@ -889,15 +889,15 @@ def load_historical_trials(
             params["max_indexing_memory_mb"] = mem
             params["max_indexing_threads"] = threads
 
-            distributions[
-                "max_indexing_memory_mb"
-            ] = optuna.distributions.CategoricalDistribution(
-                config_space["max_indexing_memory_mb"]
+            distributions["max_indexing_memory_mb"] = (
+                optuna.distributions.CategoricalDistribution(
+                    config_space["max_indexing_memory_mb"]
+                )
             )
-            distributions[
-                "max_indexing_threads"
-            ] = optuna.distributions.CategoricalDistribution(
-                config_space["max_indexing_threads"]
+            distributions["max_indexing_threads"] = (
+                optuna.distributions.CategoricalDistribution(
+                    config_space["max_indexing_threads"]
+                )
             )
 
         if not params:
@@ -1254,7 +1254,9 @@ def main():
             )
 
             # Pre-load historical results so Optuna can learn from them
-            n_loaded = load_historical_trials(study_infra, args.cloud, "infra", args.metric)
+            n_loaded = load_historical_trials(
+                study_infra, args.cloud, "infra", args.metric
+            )
             if n_loaded:
                 print(f"Loaded {n_loaded} historical trials into Optuna")
 
@@ -1296,7 +1298,9 @@ def main():
             )
 
             # Pre-load historical results so Optuna can learn from them
-            n_loaded = load_historical_trials(study_config, args.cloud, "config", args.metric)
+            n_loaded = load_historical_trials(
+                study_config, args.cloud, "config", args.metric
+            )
             if n_loaded:
                 print(f"Loaded {n_loaded} historical trials into Optuna")
 
