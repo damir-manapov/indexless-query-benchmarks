@@ -78,6 +78,11 @@ def format_results(cloud: str) -> dict | None:
     rows = []
     for r in results_sorted:
         cfg = r.get("config", {})
+        cloud_name = r.get("cloud", cloud)
+        # Calculate cost on-the-fly from config
+        cost = calculate_cost(cfg, cloud_name)
+        total = r.get("total_mib_s", 0)
+        eff = total / cost if cost > 0 else 0
         rows.append(
             {
                 "nodes": cfg.get("nodes", 0),
@@ -86,39 +91,40 @@ def format_results(cloud: str) -> dict | None:
                 "drives": cfg.get("drives_per_node", 0),
                 "size": cfg.get("drive_size_gb", 0),
                 "dtype": cfg.get("drive_type", "?"),
-                "total": r.get("total_mib_s", 0),
+                "total": total,
                 "get": r.get("get_mib_s", 0),
                 "put": r.get("put_mib_s", 0),
-                "cost": r.get("cost_per_month", 0),
-                "eff": r.get("cost_efficiency", 0),
+                "cost": cost,
+                "eff": eff,
+                "_result": r,  # Keep reference for best calculation
             }
         )
 
-    # Best configs
-    best_total = max(results, key=lambda x: x.get("total_mib_s", 0))
-    best_get = max(results, key=lambda x: x.get("get_mib_s", 0))
-    best_put = max(results, key=lambda x: x.get("put_mib_s", 0))
-    best_efficiency = max(results, key=lambda x: x.get("cost_efficiency", 0))
+    # Best configs - use rows for efficiency (calculated on-the-fly)
+    best_total_row = max(rows, key=lambda x: x.get("total", 0))
+    best_get_row = max(rows, key=lambda x: x.get("get", 0))
+    best_put_row = max(rows, key=lambda x: x.get("put", 0))
+    best_eff_row = max(rows, key=lambda x: x.get("eff", 0))
 
     return {
         "cloud": cloud,
         "rows": rows,
         "best": {
             "total": {
-                "value": best_total.get("total_mib_s", 0),
-                "config": config_summary(best_total),
+                "value": best_total_row.get("total", 0),
+                "config": config_summary(best_total_row["_result"]),
             },
             "get": {
-                "value": best_get.get("get_mib_s", 0),
-                "config": config_summary(best_get),
+                "value": best_get_row.get("get", 0),
+                "config": config_summary(best_get_row["_result"]),
             },
             "put": {
-                "value": best_put.get("put_mib_s", 0),
-                "config": config_summary(best_put),
+                "value": best_put_row.get("put", 0),
+                "config": config_summary(best_put_row["_result"]),
             },
             "efficiency": {
-                "value": best_efficiency.get("cost_efficiency", 0),
-                "config": config_summary(best_efficiency),
+                "value": best_eff_row.get("eff", 0),
+                "config": config_summary(best_eff_row["_result"]),
             },
         },
     }
@@ -829,8 +835,6 @@ def save_result(
     results = load_results(results_file())
 
     total_drives = config["nodes"] * config["drives_per_node"]
-    cost = calculate_cost(config, cloud)
-    cost_efficiency = result.total_mib_s / cost if cost > 0 else 0
 
     # Build baseline metrics dict if available
     baseline_metrics = None
@@ -874,8 +878,6 @@ def save_result(
             "cloud": cloud,
             "config": config,
             "total_drives": total_drives,
-            "cost_per_month": cost,
-            "cost_efficiency": cost_efficiency,
             "total_mib_s": result.total_mib_s,
             "get_mib_s": result.get_mib_s,
             "put_mib_s": result.put_mib_s,

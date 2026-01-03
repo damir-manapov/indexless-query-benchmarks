@@ -578,9 +578,6 @@ def save_result(
             "trial_total_s": result.timings.trial_total_s,
         }
 
-    cost = calculate_cost(infra_config, cloud)
-    cost_efficiency = result.qps / cost if cost > 0 else 0
-
     results.append(
         {
             "trial": trial_num,
@@ -588,8 +585,6 @@ def save_result(
             "cloud": cloud,
             "infra": infra_config,
             "config": meili_config,
-            "cost_per_month": cost,
-            "cost_efficiency": cost_efficiency,
             "qps": result.qps,
             "p50_ms": result.p50_ms,
             "p95_ms": result.p95_ms,
@@ -637,6 +632,10 @@ def format_results(cloud: str) -> dict | None:
     for r in results_sorted:
         infra = r.get("infra", {})
         cfg = r.get("config", {})
+        # Calculate cost on-the-fly from infra config
+        cost = calculate_cost(infra, cloud)
+        qps = r.get("qps", 0)
+        eff = qps / cost if cost > 0 else 0
         rows.append(
             {
                 "cpu": infra.get("cpu", 0),
@@ -644,48 +643,50 @@ def format_results(cloud: str) -> dict | None:
                 "disk": infra.get("disk_type", "?"),
                 "mem_mb": cfg.get("max_indexing_memory_mb", 0),
                 "threads": cfg.get("max_indexing_threads", 0),
-                "qps": r.get("qps", 0),
+                "qps": qps,
                 "p50": r.get("p50_ms", 0),
                 "p95": r.get("p95_ms", 0),
                 "p99": r.get("p99_ms", 0),
                 "idx_time": r.get("indexing_time_s", 0),
-                "cost": r.get("cost_per_month", 0),
-                "eff": r.get("cost_efficiency", 0),
+                "cost": cost,
+                "eff": eff,
+                "_result": r,  # Keep reference for best calculation
             }
         )
 
-    best_qps = max(results, key=lambda x: x.get("qps", 0))
-    best_p95 = min(
-        [r for r in results if r.get("p95_ms", float("inf")) > 0],
-        key=lambda x: x.get("p95_ms", float("inf")),
-        default=best_qps,
+    # Find best results - use rows for efficiency (calculated on-the-fly)
+    best_qps_row = max(rows, key=lambda x: x.get("qps", 0))
+    best_p95_row = min(
+        [row for row in rows if row.get("p95", float("inf")) > 0],
+        key=lambda x: x.get("p95", float("inf")),
+        default=best_qps_row,
     )
-    best_idx = min(
-        [r for r in results if r.get("indexing_time_s", 0) > 0],
-        key=lambda x: x.get("indexing_time_s", float("inf")),
-        default=best_qps,
+    best_idx_row = min(
+        [row for row in rows if row.get("idx_time", 0) > 0],
+        key=lambda x: x.get("idx_time", float("inf")),
+        default=best_qps_row,
     )
-    best_eff = max(results, key=lambda x: x.get("cost_efficiency", 0))
+    best_eff_row = max(rows, key=lambda x: x.get("eff", 0))
 
     return {
         "cloud": cloud,
         "rows": rows,
         "best": {
             "qps": {
-                "value": best_qps.get("qps", 0),
-                "config": config_summary(best_qps),
+                "value": best_qps_row.get("qps", 0),
+                "config": config_summary(best_qps_row["_result"]),
             },
             "p95": {
-                "value": best_p95.get("p95_ms", 0),
-                "config": config_summary(best_p95),
+                "value": best_p95_row.get("p95", 0),
+                "config": config_summary(best_p95_row["_result"]),
             },
             "indexing": {
-                "value": best_idx.get("indexing_time_s", 0),
-                "config": config_summary(best_idx),
+                "value": best_idx_row.get("idx_time", 0),
+                "config": config_summary(best_idx_row["_result"]),
             },
             "cost_efficiency": {
-                "value": best_eff.get("cost_efficiency", 0),
-                "config": config_summary(best_eff),
+                "value": best_eff_row.get("eff", 0),
+                "config": config_summary(best_eff_row["_result"]),
             },
         },
     }

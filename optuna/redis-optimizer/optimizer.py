@@ -76,6 +76,11 @@ def format_results(cloud: str) -> dict | None:
     for r in results_sorted:
         cfg = r.get("config", {})
         mode = cfg.get("mode", "?")
+        cloud_name = r.get("cloud", cloud)
+        # Calculate cost on-the-fly from config
+        cost = calculate_cost(cfg, cloud_name)
+        ops = r.get("ops_per_sec", 0)
+        eff = ops / cost if cost > 0 else 0
         rows.append(
             {
                 "mode": mode,
@@ -85,33 +90,34 @@ def format_results(cloud: str) -> dict | None:
                 "policy": cfg.get("maxmemory_policy", "?"),
                 "io": cfg.get("io_threads", 0),
                 "persist": cfg.get("persistence", "?"),
-                "ops": r.get("ops_per_sec", 0),
+                "ops": ops,
                 "p99": r.get("p99_latency_ms", 0),
-                "cost": r.get("cost_per_month", 0),
-                "eff": r.get("cost_efficiency", 0),
+                "cost": cost,
+                "eff": eff,
+                "_result": r,  # Keep reference for best calculation
             }
         )
 
-    # Best configs
-    best_ops = max(results, key=lambda x: x.get("ops_per_sec", 0))
-    best_latency = min(results, key=lambda x: x.get("p99_latency_ms", float("inf")))
-    best_efficiency = max(results, key=lambda x: x.get("cost_efficiency", 0))
+    # Best configs - use rows for efficiency (calculated on-the-fly)
+    best_ops_row = max(rows, key=lambda x: x.get("ops", 0))
+    best_latency_row = min(rows, key=lambda x: x.get("p99", float("inf")))
+    best_eff_row = max(rows, key=lambda x: x.get("eff", 0))
 
     return {
         "cloud": cloud,
         "rows": rows,
         "best": {
             "ops": {
-                "value": best_ops.get("ops_per_sec", 0),
-                "config": config_summary(best_ops),
+                "value": best_ops_row.get("ops", 0),
+                "config": config_summary(best_ops_row["_result"]),
             },
             "latency": {
-                "value": best_latency.get("p99_latency_ms", 0),
-                "config": config_summary(best_latency),
+                "value": best_latency_row.get("p99", 0),
+                "config": config_summary(best_latency_row["_result"]),
             },
             "efficiency": {
-                "value": best_efficiency.get("cost_efficiency", 0),
-                "config": config_summary(best_efficiency),
+                "value": best_eff_row.get("eff", 0),
+                "config": config_summary(best_eff_row["_result"]),
             },
         },
     }
@@ -491,9 +497,6 @@ def save_result(
     """Save benchmark result to JSON file."""
     results = load_results(results_file())
 
-    cost = calculate_cost(config, cloud)
-    cost_efficiency = result.ops_per_sec / cost if cost > 0 else 0
-
     timings_dict = None
     if result.timings:
         timings_dict = {
@@ -509,8 +512,6 @@ def save_result(
             "cloud": cloud,
             "config": config,
             "nodes": 1 if config["mode"] == "single" else 3,
-            "cost_per_month": cost,
-            "cost_efficiency": cost_efficiency,
             "ops_per_sec": result.ops_per_sec,
             "avg_latency_ms": result.avg_latency_ms,
             "p50_latency_ms": result.p50_latency_ms,

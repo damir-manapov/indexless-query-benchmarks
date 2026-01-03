@@ -524,9 +524,6 @@ def save_result(
     """Save benchmark result to JSON file."""
     results = load_results(results_file())
 
-    cost = calculate_cost(infra_config, cloud)
-    cost_efficiency = result.tps / cost if cost > 0 else 0
-
     timings_dict = None
     if result.timings:
         timings_dict = {
@@ -546,8 +543,6 @@ def save_result(
             "mode": mode,
             "infra_config": infra_config,
             "pg_config": pg_config,
-            "cost_per_month": cost,
-            "cost_efficiency": cost_efficiency,
             "tps": result.tps,
             "latency_avg_ms": result.latency_avg_ms,
             "latency_stddev_ms": result.latency_stddev_ms,
@@ -599,6 +594,11 @@ def format_results(cloud: str) -> dict | None:
     for r in results_sorted:
         infra = r.get("infra_config", {})
         pg = r.get("pg_config", {})
+        cloud_name = r.get("cloud", cloud)
+        # Calculate cost on-the-fly from infra config
+        cost = calculate_cost(infra, cloud_name)
+        tps = r.get("tps", 0)
+        eff = tps / cost if cost > 0 else 0
         rows.append(
             {
                 "mode": r.get("mode", "?"),
@@ -608,35 +608,37 @@ def format_results(cloud: str) -> dict | None:
                 "sb_pct": pg.get("shared_buffers_pct", 0),
                 "wm_mb": pg.get("work_mem_mb", 0),
                 "mc": pg.get("max_connections", 0),
-                "tps": r.get("tps", 0),
+                "tps": tps,
                 "lat": r.get("latency_avg_ms", 0),
-                "cost": r.get("cost_per_month", 0),
-                "eff": r.get("cost_efficiency", 0),
+                "cost": cost,
+                "eff": eff,
+                "_result": r,  # Keep reference for best calculation
             }
         )
 
-    best_tps = max(results, key=lambda x: x.get("tps", 0))
-    best_lat = min(results, key=lambda x: x.get("latency_avg_ms", float("inf")))
-    best_eff = max(results, key=lambda x: x.get("cost_efficiency", 0))
+    # Best configs - use rows for efficiency (calculated on-the-fly)
+    best_tps_row = max(rows, key=lambda x: x.get("tps", 0))
+    best_lat_row = min(rows, key=lambda x: x.get("lat", float("inf")))
+    best_eff_row = max(rows, key=lambda x: x.get("eff", 0))
 
     return {
         "cloud": cloud,
         "rows": rows,
         "best": {
             "tps": {
-                "value": best_tps.get("tps", 0),
-                "infra": infra_summary(best_tps.get("infra_config", {})),
-                "pg": pg_summary(best_tps.get("pg_config", {})),
+                "value": best_tps_row.get("tps", 0),
+                "infra": infra_summary(best_tps_row["_result"].get("infra_config", {})),
+                "pg": pg_summary(best_tps_row["_result"].get("pg_config", {})),
             },
             "latency": {
-                "value": best_lat.get("latency_avg_ms", 0),
-                "infra": infra_summary(best_lat.get("infra_config", {})),
-                "pg": pg_summary(best_lat.get("pg_config", {})),
+                "value": best_lat_row.get("lat", 0),
+                "infra": infra_summary(best_lat_row["_result"].get("infra_config", {})),
+                "pg": pg_summary(best_lat_row["_result"].get("pg_config", {})),
             },
             "efficiency": {
-                "value": best_eff.get("cost_efficiency", 0),
-                "infra": infra_summary(best_eff.get("infra_config", {})),
-                "pg": pg_summary(best_eff.get("pg_config", {})),
+                "value": best_eff_row.get("eff", 0),
+                "infra": infra_summary(best_eff_row["_result"].get("infra_config", {})),
+                "pg": pg_summary(best_eff_row["_result"].get("pg_config", {})),
             },
         },
     }
