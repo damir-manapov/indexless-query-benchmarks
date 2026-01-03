@@ -68,7 +68,15 @@ def wait_for_vm_ready(
                 return True
             else:
                 elapsed = int(time.time() - start)
-                print(f"  Marker file not ready yet ({elapsed}s elapsed)")
+                # Show tail of cloud-init log to help debug
+                _, log_tail = run_ssh_command(
+                    vm_ip,
+                    "tail -3 /var/log/cloud-init-output.log 2>/dev/null || echo 'no log yet'",
+                    timeout=10,
+                    jump_host=jump_host,
+                )
+                log_preview = log_tail.strip().replace("\n", " | ") if log_tail else "no output"
+                print(f"  Marker file not ready yet ({elapsed}s elapsed): {log_preview}")
         except Exception as e:
             print(f"  SSH not ready yet: {e}")
         time.sleep(10)

@@ -843,7 +843,7 @@ def main():
     parser.add_argument("--trials", "-t", type=int, default=10, help="Number of trials")
     parser.add_argument(
         "--metric",
-        default="p95_ms",
+        default="qps",
         choices=["p95_ms", "qps", "indexing_time"],
         help="Metric to optimize",
     )
