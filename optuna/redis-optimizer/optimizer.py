@@ -40,6 +40,7 @@ from common import (
 )
 
 from cloud_config import CloudConfig, get_cloud_config, get_config_space
+from pricing import validate_infra_config
 
 RESULTS_DIR = Path(__file__).parent
 STUDY_DB = RESULTS_DIR / "study.db"
@@ -567,6 +568,11 @@ def objective(
             "persistence", config_space["persistence"]
         ),
     }
+
+    # Validate cloud constraints (e.g., 16 vCPU requires min 32GB RAM)
+    constraint_error = validate_infra_config(cloud, config["cpu_per_node"], config["ram_per_node"])
+    if constraint_error:
+        raise optuna.TrialPruned(constraint_error)
 
     print(f"\n{'=' * 60}")
     print(f"Trial {trial.number} [{cloud}]: {config}")
