@@ -116,11 +116,11 @@ def get_infra_search_space():
     # Selectel Standard Line: valid CPU/RAM combinations
     # 2 vCPU: 4-16GB, 4 vCPU: 8-32GB, 8 vCPU: 16-32GB, 16 vCPU: 32GB, 32 vCPU: 64GB
     # Disk types per Selectel docs:
-    # - fast: SSD Быстрый (NVMe)
-    # - universal2: SSD Универсальный v2 (with IOPS billing)
-    # - universal: SSD Универсальный
-    # - basicssd: SSD Базовый
-    # - basic: HDD Базовый
+    # - fast: SSD Fast (NVMe)
+    # - universal2: SSD Universal v2 (with IOPS billing)
+    # - universal: SSD Universal
+    # - basicssd: SSD Basic
+    # - basic: HDD Basic
     return {
         "cpu": [2, 4, 8, 16, 32],
         "ram_gb": [4, 8, 16, 32, 64],
