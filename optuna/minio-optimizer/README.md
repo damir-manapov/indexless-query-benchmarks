@@ -23,10 +23,10 @@ The optimizer is fully self-sufficient and handles:
 
 ## Supported Clouds
 
-| Cloud    | Terraform Dir         | Disk Types             |
-| -------- | --------------------- | ---------------------- |
-| Selectel | `terraform/selectel/` | fast, universal, basic |
-| Timeweb  | `terraform/timeweb/`  | nvme                   |
+| Cloud    | Terraform Dir         | Disk Types                                   |
+| -------- | --------------------- | -------------------------------------------- |
+| Selectel | `terraform/selectel/` | fast, universal2, universal, basicssd, basic |
+| Timeweb  | `terraform/timeweb/`  | nvme, ssd, hdd                               |
 
 ## Setup
 
@@ -74,14 +74,14 @@ Configuration space varies by cloud (defined in `cloud_config.py`):
 
 ### Selectel
 
-| Parameter       | Values                 | Notes                 |
-| --------------- | ---------------------- | --------------------- |
-| nodes           | 1, 2, 4                | Number of MinIO nodes |
-| cpu_per_node    | 2, 4, 8                | vCPU per MinIO node   |
-| ram_per_node    | 4, 8, 16, 32           | GB per node           |
-| drives_per_node | 1, 2, 4                | Drives per node       |
-| drive_size_gb   | 100, 200               | Size per drive        |
-| drive_type      | fast, universal, basic | SSD tier              |
+| Parameter       | Values                                       | Notes                         |
+| --------------- | -------------------------------------------- | ----------------------------- |
+| nodes           | 1, 2, 4                                      | Number of MinIO nodes         |
+| cpu_per_node    | 2, 4, 8                                      | vCPU per MinIO node           |
+| ram_per_node    | 4, 8, 16, 32                                 | GB per node                   |
+| drives_per_node | 1, 2, 4                                      | Drives per node               |
+| drive_size_gb   | 100, 200                                     | Size per drive                |
+| drive_type      | fast, universal2, universal, basicssd, basic | SSD/HDD tier (see pricing.py) |
 
 ### Timeweb
 

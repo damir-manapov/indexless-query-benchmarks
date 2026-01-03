@@ -46,7 +46,7 @@ _TERRAFORM_RESOURCES = {
 }
 
 _DISK_TYPES = {
-    "selectel": ["fast", "universal", "basic"],
+    "selectel": ["fast", "universal2", "universal", "basicssd", "basic"],
     "timeweb": ["nvme", "ssd", "hdd"],
 }
 

@@ -38,8 +38,10 @@ def _make_config(
 
 
 # Cloud configs using common pricing
-SELECTEL_CONFIG = _make_config("selectel", "selectel", ["fast", "universal", "basic"])
-TIMEWEB_CONFIG = _make_config("timeweb", "timeweb", ["nvme", "hdd"])
+SELECTEL_CONFIG = _make_config(
+    "selectel", "selectel", ["fast", "universal2", "universal", "basicssd", "basic"]
+)
+TIMEWEB_CONFIG = _make_config("timeweb", "timeweb", ["nvme", "ssd", "hdd"])
 
 
 def get_cloud_config(cloud: str) -> CloudConfig:

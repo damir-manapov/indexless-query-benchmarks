@@ -52,11 +52,11 @@ uv run python meilisearch-optimizer/optimizer.py --cloud selectel --mode infra -
 
 ### Infrastructure (--mode infra)
 
-| Parameter | Values          | Notes       |
-| --------- | --------------- | ----------- |
-| cpu       | 2, 4, 8, 16     | vCPU count  |
-| ram_gb    | 4, 8, 16, 32    | GB per VM   |
-| disk_type | fast, universal | NVMe vs SSD |
+| Parameter | Values                                       | Notes                         |
+| --------- | -------------------------------------------- | ----------------------------- |
+| cpu       | 2, 4, 8, 16                                  | vCPU count                    |
+| ram_gb    | 4, 8, 16, 32                                 | GB per VM                     |
+| disk_type | fast, universal2, universal, basicssd, basic | SSD/HDD tier (see pricing.py) |
 
 ### Meilisearch Config (--mode config)
 

@@ -76,13 +76,13 @@ uv run python postgres-optimizer/optimizer.py --cloud timeweb --mode config --tr
 
 ### Infrastructure (--mode infra)
 
-| Parameter    | Values           | Notes               |
-| ------------ | ---------------- | ------------------- |
-| mode         | single, cluster  | Deployment topology |
-| cpu          | 2, 4, 8, 16      | vCPU per node       |
-| ram_gb       | 4, 8, 16, 32, 64 | GB per node         |
-| disk_type    | nvme, ssd, hdd   | Storage type        |
-| disk_size_gb | 50, 100, 200     | Disk size in GB     |
+| Parameter    | Values                                       | Notes                         |
+| ------------ | -------------------------------------------- | ----------------------------- |
+| mode         | single, cluster                              | Deployment topology           |
+| cpu          | 2, 4, 8, 16                                  | vCPU per node                 |
+| ram_gb       | 4, 8, 16, 32, 64                             | GB per node                   |
+| disk_type    | fast, universal2, universal, basicssd, basic | SSD/HDD tier (see pricing.py) |
+| disk_size_gb | 50, 100, 200                                 | Disk size in GB               |
 
 ### PostgreSQL Config (--mode config)
 
