@@ -143,6 +143,7 @@ class Trial(BaseModel):
     timestamp: datetime = Field(
         default_factory=datetime.now, description="When the trial was run"
     )
+    login: str | None = Field(default=None, description="Login of who ran the trial")
     service: ServiceType = Field(description="Service being benchmarked")
     cloud: str = Field(description="Cloud provider (e.g., 'selectel')")
     infra: InfraConfig = Field(description="Infrastructure configuration")

@@ -418,6 +418,27 @@ class TestTrialModels:
         assert trial.timestamp is not None
         assert isinstance(trial.timestamp, datetime)
 
+    def test_login_optional(self, sample_infra: InfraConfig):
+        """Login should be optional and default to None."""
+        trial = Trial(
+            service="meilisearch",
+            cloud="selectel",
+            infra=sample_infra,
+            config=MeilisearchConfig(),
+        )
+        assert trial.login is None
+
+    def test_login_stored(self, sample_infra: InfraConfig):
+        """Login should be stored when provided."""
+        trial = Trial(
+            service="meilisearch",
+            cloud="selectel",
+            infra=sample_infra,
+            config=MeilisearchConfig(),
+            login="damir",
+        )
+        assert trial.login == "damir"
+
 
 class TestTrialCount:
     """Tests for TrialStore.count()."""
