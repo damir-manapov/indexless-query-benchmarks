@@ -15,4 +15,8 @@ echo "=== Type Checking (pyright) ==="
 uv run pyright .
 
 echo ""
+echo "=== Running Tests (pytest) ==="
+uv run pytest storage/tests/ -v
+
+echo ""
 echo "=== Python Check Passed ==="
