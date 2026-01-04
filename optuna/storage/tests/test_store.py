@@ -439,6 +439,16 @@ class TestTrialModels:
         )
         assert trial.login == "damir"
 
+    def test_schema_version_default(self, sample_infra: InfraConfig):
+        """Schema version should default to 1."""
+        trial = Trial(
+            service="meilisearch",
+            cloud="selectel",
+            infra=sample_infra,
+            config=MeilisearchConfig(),
+        )
+        assert trial.schema_version == 1
+
 
 class TestTrialCount:
     """Tests for TrialStore.count()."""

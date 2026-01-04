@@ -139,6 +139,7 @@ ServiceType = Literal["meilisearch", "redis", "postgres", "minio"]
 class Trial(BaseModel):
     """A single benchmark trial result."""
 
+    schema_version: int = Field(default=1, description="Data schema version")
     id: int | None = Field(default=None, description="Auto-assigned trial ID")
     timestamp: datetime = Field(
         default_factory=datetime.now, description="When the trial was run"
