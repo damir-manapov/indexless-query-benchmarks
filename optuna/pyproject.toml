@@ -5,6 +5,7 @@ description = "Bayesian optimization for cloud infrastructure (MinIO, Redis)"
 requires-python = ">=3.11"
 dependencies = [
     "optuna>=3.5.0",
+    "pydantic>=2.12.5",
     "python-terraform>=0.10.1",
 ]
 
@@ -12,4 +13,5 @@ dependencies = [
 dev = [
     "ruff>=0.8.0",
     "pyright>=1.1.0",
+    "pytest>=9.0.2",
 ]

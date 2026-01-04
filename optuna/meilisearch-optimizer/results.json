@@ -1202,5 +1202,86 @@
       "benchmark_s": 64.52707409858704,
       "trial_total_s": 100.25151705741882
     }
+  },
+  {
+    "trial": 441,
+    "timestamp": "2026-01-04T01:53:14.817805",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 64,
+      "disk_type": "universal2"
+    },
+    "config": {},
+    "qps": 2413.8368032370436,
+    "p50_ms": 43,
+    "p95_ms": 49,
+    "p99_ms": 53,
+    "error_rate": 0.0,
+    "indexing_time_s": 24.74293851852417,
+    "error": null,
+    "timings": {
+      "terraform_s": 153.83040022850037,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 44.41644740104675,
+      "benchmark_s": 64.50327658653259,
+      "trial_total_s": 267.9342451095581
+    }
+  },
+  {
+    "trial": 568,
+    "timestamp": "2026-01-04T02:26:35.506801",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 8,
+      "disk_type": "universal2"
+    },
+    "config": {},
+    "qps": 3052.2912979926678,
+    "p50_ms": 31,
+    "p95_ms": 38,
+    "p99_ms": 41,
+    "error_rate": 0.0,
+    "indexing_time_s": 15.762514114379883,
+    "error": null,
+    "timings": {
+      "terraform_s": 170.27851510047913,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 24.865814685821533,
+      "benchmark_s": 64.4617235660553,
+      "trial_total_s": 264.8064241409302
+    }
+  },
+  {
+    "trial": 569,
+    "timestamp": "2026-01-04T02:31:47.184440",
+    "cloud": "selectel",
+    "infra": {
+      "cpu": 4,
+      "ram_gb": 32,
+      "disk_type": "universal2"
+    },
+    "config": {},
+    "qps": 3341.6745512734715,
+    "p50_ms": 28,
+    "p95_ms": 33,
+    "p99_ms": 35,
+    "error_rate": 0.0,
+    "indexing_time_s": 15.886703968048096,
+    "error": null,
+    "timings": {
+      "terraform_s": 163.5097393989563,
+      "vm_ready_s": 0.0,
+      "meili_ready_s": 0.0,
+      "dataset_gen_s": 0.0,
+      "indexing_s": 25.007755756378174,
+      "benchmark_s": 64.39193487167358,
+      "trial_total_s": 311.6452615261078
+    }
   }
 ]
